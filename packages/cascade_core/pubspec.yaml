@@ -1,0 +1,19 @@
+name: cascade_core
+description: App- and transport-agnostic core of the Flutter acceptance-test harness.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  bloc: ^9.2.0
+  flutter:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  meta: ^1.16.0
+
+dev_dependencies:
+  very_good_analysis: ^10.3.0
