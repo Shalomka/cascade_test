@@ -101,6 +101,80 @@ void main() {
       },
     );
 
+    test(
+      'maps each non-timeout BoundaryErrorKind to a faithful '
+      'DioExceptionType',
+      () async {
+        const cases = <BoundaryErrorKind, DioExceptionType>{
+          BoundaryErrorKind.connection: DioExceptionType.connectionError,
+          BoundaryErrorKind.cancel: DioExceptionType.cancel,
+          BoundaryErrorKind.badResponse: DioExceptionType.badResponse,
+          BoundaryErrorKind.callable: DioExceptionType.unknown,
+          BoundaryErrorKind.unknown: DioExceptionType.unknown,
+        };
+
+        for (final entry in cases.entries) {
+          final localRegistry = StubRegistry()
+            ..defaultLatency = Duration.zero
+            ..register(
+              Stub(
+                matcher: const RequestMatcher('GET', '/fail'),
+                outcomes: [
+                  FailWith(BoundaryError(kind: entry.key, message: 'boom')),
+                ],
+              ),
+            );
+          final dio = _dio(localRegistry);
+
+          DioException? error;
+          try {
+            await dio.get<dynamic>('/fail');
+          } on DioException catch (e) {
+            error = e;
+          }
+
+          expect(error, isNotNull, reason: '${entry.key} should raise');
+          expect(error!.type, entry.value, reason: 'kind ${entry.key}');
+          expect(error.message, 'boom');
+          // No statusCode on the error → no attached response.
+          expect(error.response, isNull);
+        }
+      },
+    );
+
+    test(
+      'attaches a Response carrying the error statusCode and body',
+      () async {
+        registry.register(
+          Stub(
+            matcher: const RequestMatcher('GET', '/fail'),
+            outcomes: const [
+              FailWith(
+                BoundaryError(
+                  kind: BoundaryErrorKind.badResponse,
+                  statusCode: 503,
+                  body: {'reason': 'down'},
+                ),
+              ),
+            ],
+          ),
+        );
+        final dio = _dio(registry);
+
+        DioException? error;
+        try {
+          await dio.get<dynamic>('/fail');
+        } on DioException catch (e) {
+          error = e;
+        }
+
+        expect(error, isNotNull);
+        expect(error!.response, isNotNull);
+        expect(error.response!.statusCode, 503);
+        expect(error.response!.data, {'reason': 'down'});
+      },
+    );
+
     test('applies the configured latency before responding (R2.5)', () async {
       registry
         ..defaultLatency = const Duration(milliseconds: 120)

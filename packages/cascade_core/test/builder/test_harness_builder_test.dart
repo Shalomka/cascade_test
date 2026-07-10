@@ -22,6 +22,15 @@ BoundaryRequest _post(String endpoint, {Object? body}) => BoundaryRequest(
   body: body,
 );
 
+BoundaryRequest _request(String method, String endpoint) => BoundaryRequest(
+  kind: BoundaryKind.http,
+  method: method,
+  endpoint: endpoint,
+);
+
+int _statusOf(ResolvedOutcome resolved) =>
+    (resolved.outcome as RespondWith).response.statusCode;
+
 void main() {
   late BlocObserver originalObserver;
 
@@ -61,6 +70,56 @@ void main() {
             .statusCode,
         200,
       );
+    });
+
+    test('withPut and withDelete register method-specific stubs', () {
+      final builder = TestHarnessBuilder()
+        ..withPut('/items/1', data: {'ok': true})
+        ..withDelete('/items/1', statusCode: 204);
+
+      expect(
+        (builder.registry.resolve(_request('PUT', '/items/1')).outcome
+                as RespondWith)
+            .response
+            .body,
+        {'ok': true},
+      );
+      expect(
+        _statusOf(builder.registry.resolve(_request('DELETE', '/items/1'))),
+        204,
+      );
+    });
+
+    test('withGetSequence programs successive GET responses (R2.6)', () {
+      final builder = TestHarnessBuilder()
+        ..withGetSequence('/feed', const [
+          Res(500),
+          Res(200, data: {'ok': true}),
+        ]);
+
+      expect(_statusOf(builder.registry.resolve(_get('/feed'))), 500);
+      expect(_statusOf(builder.registry.resolve(_get('/feed'))), 200);
+    });
+
+    test('withStub registers an arbitrary stub (escape hatch)', () {
+      final builder = TestHarnessBuilder()
+        ..withStub(
+          Stub(
+            matcher: const RequestMatcher('GET', '/raw'),
+            outcomes: const [RespondWith(BoundaryResponse(statusCode: 204))],
+          ),
+        );
+
+      expect(_statusOf(builder.registry.resolve(_get('/raw'))), 204);
+    });
+
+    test('expectCalled and expectNeverCalled delegate to the recorder', () {
+      final builder = TestHarnessBuilder()..withGet('/policies', data: {});
+      builder.registry.resolve(_get('/policies'));
+
+      builder
+        ..expectCalled('/policies', method: 'GET', times: 1)
+        ..expectNeverCalled('/absent');
     });
 
     test('mutators are side-effect-free until buildHarness (R3.2)', () {

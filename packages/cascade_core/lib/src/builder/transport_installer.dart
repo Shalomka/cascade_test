@@ -1,9 +1,16 @@
+import 'dart:async';
+
 import 'package:cascade_core/src/registry/stub_registry.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// A configuration step run against the [Harness] at build time.
-typedef InstallStep = void Function(Harness harness);
+///
+/// A step may be synchronous (adapter installation) or asynchronous (e.g.
+/// Firestore/Storage seeding). Async steps return a [Future]; the builder
+/// tracks it via [Harness.registerPending] so callers can await all seeding
+/// through `buildHarnessAsync`.
+typedef InstallStep = FutureOr<void> Function(Harness harness);
 
 /// The container that exposes the shared [StubRegistry] and the transport
 /// fakes installed by adapter packages.
@@ -20,6 +27,20 @@ final class Harness {
   final StubRegistry registry;
 
   final Map<Type, Object> _installed = <Type, Object>{};
+
+  final List<Future<void>> _pending = <Future<void>>[];
+
+  /// Registers a [future] that must complete before the harness's seeded state
+  /// (Firestore/Storage) is guaranteed committed.
+  ///
+  /// Called by the builder for every async install step; awaited together via
+  /// [whenReady]. Registering (rather than swallowing) the future ensures seed
+  /// errors surface instead of being silently dropped.
+  void registerPending(Future<void> future) => _pending.add(future);
+
+  /// Completes once every async install step has finished, so all seeded state
+  /// is present and any seeding error is propagated (R6.1).
+  Future<void> get whenReady => Future.wait(_pending);
 
   /// Stores an installed transport object keyed by its type.
   void put<T extends Object>(T value) => _installed[T] = value;

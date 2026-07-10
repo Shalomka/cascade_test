@@ -139,6 +139,65 @@ void main() {
       await tester.expectInputHasFocus(const Key('email'));
     });
 
+    testWidgets(
+      'enterPinByKey fills the EditableText and expectPinInputHasText '
+      'reads it back',
+      (tester) async {
+        final controller = TextEditingController();
+        addTearDown(controller.dispose);
+        await tester.pumpWidget(
+          MinimalApp(
+            child: TextField(key: const Key('pin'), controller: controller),
+          ),
+        );
+
+        await tester.enterPinByKey(const Key('pin'), '1234');
+
+        await tester.expectPinInputHasText(const Key('pin'), '1234');
+        expect(controller.text, '1234');
+      },
+    );
+
+    testWidgets('submitText fires the focused field submit action', (
+      tester,
+    ) async {
+      String? submittedValue;
+      final controller = TextEditingController();
+      final focusNode = FocusNode();
+      addTearDown(controller.dispose);
+      addTearDown(focusNode.dispose);
+      await tester.pumpWidget(
+        MinimalApp(
+          child: TextField(
+            key: const Key('search'),
+            controller: controller,
+            focusNode: focusNode,
+            onSubmitted: (value) => submittedValue = value,
+          ),
+        ),
+      );
+
+      await tester.enterTextByKey(const Key('search'), 'query');
+      await tester.submitText();
+
+      expect(submittedValue, 'query');
+    });
+
+    testWidgets(
+      'pumpThroughAnimations with an explicit duration advances the clock',
+      (tester) async {
+        await tester.pumpWidget(const MinimalApp(child: _DelayedReveal()));
+
+        // _DelayedReveal flips at 250ms; two 200ms pumps (400ms) reveal it.
+        final result = await tester.pumpThroughAnimations(
+          const Duration(milliseconds: 200),
+        );
+
+        expect(result, same(tester));
+        expect(find.byKey(const Key('revealed')), findsOneWidget);
+      },
+    );
+
     testWidgets('pumpUntil waits for a delayed widget deterministically', (
       tester,
     ) async {

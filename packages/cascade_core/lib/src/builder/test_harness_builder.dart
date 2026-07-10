@@ -202,8 +202,22 @@ class TestHarnessBuilder {
 
     final harness = Harness(registry);
     for (final step in _installSteps) {
-      step(harness);
+      final result = step(harness);
+      if (result is Future<void>) harness.registerPending(result);
     }
+    return harness;
+  }
+
+  /// Builds the harness and awaits every async install step (e.g. Firebase
+  /// seeding) so all seeded state is committed and any seeding error is
+  /// surfaced before returning (R6.1).
+  ///
+  /// Prefer this over [buildHarness] whenever the test reads seeded transport
+  /// state directly after building. The awaiting happens here in the async
+  /// build path — never inside a widget `build` — so R3.1/R3.2 hold.
+  Future<Harness> buildHarnessAsync() async {
+    final harness = buildHarness();
+    await harness.whenReady;
     return harness;
   }
 }

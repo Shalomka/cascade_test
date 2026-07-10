@@ -15,9 +15,12 @@ void main() {
           ..withCollection('users', [
             {'id': 'u1', 'name': 'Ada'},
           ])
+          ..withDocument('config/app', {'flag': true})
+          ..withStorageObject('avatars/u1.txt', 'hi')
           ..withCallable('createOrder', error: FunctionsError.permissionDenied);
 
-        final harness = builder.buildHarness();
+        // buildHarnessAsync awaits seeding, so seeds are committed on return.
+        final harness = await builder.buildHarnessAsync();
 
         // The callable stub was registered on the builder's shared registry.
         expect(builder.registry.stubs, isNotEmpty);
@@ -25,13 +28,21 @@ void main() {
         // Auth is seeded as signed-in.
         expect(harness.auth.currentUser?.uid, 'u1');
 
-        // Let the (unawaited) seed writes drain before reading Firestore.
-        await Future<void>.delayed(Duration.zero);
+        // Firestore collection + document seeds are readable immediately — no
+        // drain/delay needed (I1).
         final user = await harness.firestore
             .collection('users')
             .doc('u1')
             .get();
         expect(user.data(), containsPair('name', 'Ada'));
+        final config = await harness.firestore.doc('config/app').get();
+        expect(config.data(), containsPair('flag', true));
+
+        // The storage seed is committed too.
+        expect(
+          harness.storage.storedDataMap.containsKey('avatars/u1.txt'),
+          isTrue,
+        );
 
         // The callable flows through the same registry and throws a real error.
         await expectLater(

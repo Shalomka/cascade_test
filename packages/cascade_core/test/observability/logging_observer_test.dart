@@ -8,6 +8,16 @@ class _CounterCubit extends Cubit<int> {
   void increment() => emit(state + 1);
 }
 
+class _IncrementEvent {
+  const _IncrementEvent();
+}
+
+class _CounterBloc extends Bloc<_IncrementEvent, int> {
+  _CounterBloc() : super(0) {
+    on<_IncrementEvent>((event, emit) => emit(state + 1));
+  }
+}
+
 void main() {
   late BlocObserver originalObserver;
 
@@ -41,6 +51,36 @@ void main() {
       expect(cubit.state, 1);
 
       await cubit.close();
+    });
+
+    test('onEvent prints for a Bloc event (R7.2)', () async {
+      Bloc.observer = const LoggingObserver();
+      final bloc = _CounterBloc();
+      addTearDown(bloc.close);
+
+      await expectLater(
+        () async {
+          bloc.add(const _IncrementEvent());
+          await bloc.stream.first;
+        },
+        prints(contains('EVENT: _CounterBloc')),
+      );
+
+      expect(bloc.state, 1);
+    });
+
+    test('onError prints the error with the bloc type (R7.2)', () {
+      final cubit = _CounterCubit();
+      addTearDown(cubit.close);
+
+      expect(
+        () => const LoggingObserver().onError(
+          cubit,
+          StateError('boom'),
+          StackTrace.empty,
+        ),
+        prints(contains('ERROR: _CounterCubit -> Bad state: boom')),
+      );
     });
   });
 }

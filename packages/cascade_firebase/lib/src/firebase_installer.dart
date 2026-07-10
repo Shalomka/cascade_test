@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:cascade_core/cascade_core.dart';
 import 'package:cascade_firebase/src/auth_seeder.dart';
 import 'package:cascade_firebase/src/callable_client.dart';
@@ -30,25 +28,25 @@ extension FirebaseInstaller on TestHarnessBuilder {
   /// seeds at build time (R3.2). Exposes them via the `Harness` getters.
   void useFirebase() {
     final config = _config;
-    addInstallStep((harness) {
+    addInstallStep((harness) async {
       final firestore = FakeFirebaseFirestore();
       final auth = buildMockAuth(signedIn: config.signedIn, user: config.user);
       final storage = MockFirebaseStorage();
-
-      unawaited(
-        seedFirestore(
-          firestore,
-          collections: config.collections,
-          documents: config.documents,
-        ),
-      );
-      unawaited(seedStorage(storage, config.storageObjects));
 
       harness
         ..put<FakeFirebaseFirestore>(firestore)
         ..put<MockFirebaseAuth>(auth)
         ..put<MockFirebaseStorage>(storage)
         ..put<CallableClient>(FakeCallableClient(harness.registry));
+
+      // Awaited so the seeds are committed before `buildHarnessAsync` returns
+      // and so any seeding error surfaces instead of being swallowed (I1).
+      await seedFirestore(
+        firestore,
+        collections: config.collections,
+        documents: config.documents,
+      );
+      await seedStorage(storage, config.storageObjects);
     });
   }
 
