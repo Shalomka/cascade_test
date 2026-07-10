@@ -6,7 +6,7 @@ date: 2026-07-10
 
 ## Universal Flutter Acceptance-Test Harness — Extensive Plan
 
-> **Source of truth:** `/Users/robertasskiauteris/flutterprojects/teroxx/front_end/docs/test_harness_requirements.md`
+> **Source of truth:** `docs/test_harness_requirements.md`
 > (R1.1–R7.3, AC1–AC6, D1–D5).
 > **Brainstorm:** `docs/brainstorm/2026-07-10-universal-flutter-acceptance-test-harness-brainstorm-doc.md`.
 > **Run ledger:** `docs/.wingspan-run.md` (local-branch-only `feat/test-harness`, full spec, unattended).
@@ -47,7 +47,7 @@ no PR, no CI, no remote.
 
 ## Problem Statement
 
-Teroxx `front_end` has a fluent widget-test harness (`test/support/test_app.dart`, 1020 LOC)
+the reference app `front_end` has a fluent widget-test harness (`test/support/test_app.dart`, 1020 LOC)
 that ~100 test files depend on. It works but has two structural defects the spec targets:
 
 1. **App-coupled.** It imports `App`, `app_ui`, and feature keys directly
@@ -318,7 +318,7 @@ fixing the prior art's R3.2 violation. `build()` returns a pure, side-effect-fre
 
 ### `WidgetTesterX` verbs (R4.3) — full ported list
 
-Ported from `teroxx/front_end/test/support/test_app.dart:641-937`, de-coupled from app types:
+Ported from `reference-app/test/support/test_app.dart:641-937`, de-coupled from app types:
 `pumpThroughAnimations([duration])`, `expectWidget`, `expectNoWidget`, `expectText` (Text +
 RichText descendants), `tapButton`, `enterTextByKey`, `enterPinByKey`, `submitText`,
 `expectInputHasText`, `expectPinInputHasText`, `expectInputHasFocus`, `expectButtonEnabled`,
@@ -400,7 +400,7 @@ the count. Test files follow VGV **one-test-file-per-unit**.
 | `packages/cascade_core/lib/src/builder/transport_installer.dart` | C | `TransportInstaller` seam + `Harness` (exposes installed fakes) + `HarnessBinding` (AC3). |
 | `packages/cascade_core/lib/src/builder/harness_config.dart` | C | `HarnessConfig`, `ButtonResolver`, `TextExtractor`, `configureHarness`/`resetHarnessConfig` (R4.4). |
 | `packages/cascade_core/lib/src/tester/widget_tester_x.dart` | C | Full R4.3 verb list + `pumpUntil`; consults `HarnessConfig`. |
-| `packages/cascade_core/lib/src/tester/finder_extensions.dart` | C | Internal `verifyText` helper (ported from Teroxx `helpers/finder_extension.dart`). |
+| `packages/cascade_core/lib/src/tester/finder_extensions.dart` | C | Internal `verifyText` helper (ported from the reference app `helpers/finder_extension.dart`). |
 | `packages/cascade_core/lib/src/robot/robot.dart` | C | `Robot` base holding `WidgetTester` + R4.3 verbs (R5.1, R5.3 `...IfPresent` guidance). |
 | `packages/cascade_core/lib/src/observability/logging_observer.dart` | C | `LoggingObserver extends BlocObserver` (R7.2). |
 | `packages/cascade_core/lib/src/observability/boundary_log.dart` | C | Boundary-call log formatting + toggle (R7.1). |
@@ -411,10 +411,10 @@ the count. Test files follow VGV **one-test-file-per-unit**.
 | `packages/cascade_core/test/registry/missing_stub_error_test.dart` | C | Message contains method + endpoint + payload (AC2). |
 | `packages/cascade_core/test/builder/test_harness_builder_test.dart` | C | Cascade purity, verb→registry wiring, `buildHarness` side-effect placement (R3.1-R3.2). |
 | `packages/cascade_core/test/builder/harness_config_test.dart` | C | Resolver/extractor precedence (R4.4). |
-| `packages/cascade_core/test/tester/widget_tester_x_test.dart` | C | Port of Teroxx `widget_tester_x_test.dart` against `MinimalApp` (R4.3). |
+| `packages/cascade_core/test/tester/widget_tester_x_test.dart` | C | Port of the reference app `widget_tester_x_test.dart` against `MinimalApp` (R4.3). |
 | `packages/cascade_core/test/robot/robot_test.dart` | C | Robot base verbs (R5.1). |
 | `packages/cascade_core/test/observability/logging_observer_test.dart` | C | Observer opt-in behavior (R7.2). |
-| `packages/cascade_core/test/helpers/minimal_app.dart` | C | Test-only `MinimalApp` (ported from Teroxx `minimal_app.dart`, de-app-coupled). |
+| `packages/cascade_core/test/helpers/minimal_app.dart` | C | Test-only `MinimalApp` (ported from the reference app `minimal_app.dart`, de-app-coupled). |
 | `packages/cascade_core/test/no_forbidden_imports_test.dart` | C | **AC5 guard:** asserts `lib/` contains no `package:dio`/`package:http`/`package:*firebase*`/`package:cloud_*` import. |
 
 ### `packages/cascade_dio` (Layer B)
@@ -556,7 +556,7 @@ very_good_cli MCP `test` tool. Do not advance on a red gate.
   `logging_observer.dart`, `boundary_log.dart`. Add `test/helpers/minimal_app.dart` and the
   AC5 guard test.
 - **Tests to write:** `test_harness_builder_test` (cascade purity + R3.2 side-effect
-  placement), `harness_config_test` (R4.4 precedence), `widget_tester_x_test` (port of Teroxx
+  placement), `harness_config_test` (R4.4 precedence), `widget_tester_x_test` (port of the reference app
   suite against `MinimalApp`), `robot_test`, `logging_observer_test`,
   `no_forbidden_imports_test`.
 - **Success criteria:** Green; `cascade_core` has zero forbidden imports (guard test passes);
@@ -658,7 +658,7 @@ very_good_cli MCP `test` tool. Do not advance on a red gate.
 | **AC1** | dio + Firebase demo passing acceptance test | `packages/demo_dio_firebase/test/acceptance/ac1_full_flow_test.dart` | Single `testWidgets` seeds Firestore, stubs 1 GET + 1 POST(403→200) + 1 callable error, logs in via robot, drives by keys only, asserts `expectText` **and** `expectCalledWith('/orders', ...)`; test is green. | R2.5,R2.6,R2.7,R4,R5,R6.1,R6.2,D4 |
 | **AC2** | Unstubbed call fails with method + full path | `packages/demo_dio_firebase/test/acceptance/ac2_unstubbed_call_test.dart` + `cascade_core/test/registry/missing_stub_error_test.dart` | Triggering an unstubbed boundary throws `MissingStubError`; asserted message contains the HTTP method and full path/route. | R2.3 |
 | **AC3** | Second `http` demo passes same-shaped test, only Layer B/C swapped | `packages/demo_http/test/acceptance/ac3_mirror_flow_test.dart` + `packages/demo_http/test/robots_parity_test.dart` | AC3 flow (GET + POST 403→200 + `expectCalledWith`) green; parity test asserts `login_robot.dart`+`orders_robot.dart` are byte-identical across demos; zero Layer A source diff. | R1.1,R2,R4,R5 |
-| **AC4** | Teroxx suite stays green with Layer A added | `docs/MIGRATION.md` + README compatibility note | **Design + docs only** (external teroxx repo is out of scope for this run — see Assumptions A7). Compatibility argument: `cascade_core` deps = `flutter_test`/`bloc`/`meta`, no globals, observer set only when provided; addable beside an existing harness with no collision. | R1.4 |
+| **AC4** | reference-app suite stays green with Layer A added | `docs/MIGRATION.md` + README compatibility note | **Design + docs only** (external reference-app repo is out of scope for this run — see Assumptions A7). Compatibility argument: `cascade_core` deps = `flutter_test`/`bloc`/`meta`, no globals, observer set only when provided; addable beside an existing harness with no collision. | R1.4 |
 | **AC5** | No Layer A/B import of app/app_ui/firebase/dio/http outside its adapter | `cascade_core`, `cascade_dio`, `cascade_http`, `cascade_firebase` `test/no_forbidden_imports_test.dart` + pubspec graph | Each Layer A/B pubspec omits the forbidden transports; each guard test asserts zero forbidden import strings in `lib/`; `flutter analyze` would error on any stray import (dep absent). | R1.1,R6.4 |
 | **AC6** | README: adoption checklist, key convention, writing robots, migration note | root `README.md` + `docs/MIGRATION.md` | README contains the four sections (checkable headings); migration note present. | R1.3,R4.2,R1.4 |
 
@@ -727,7 +727,7 @@ points for every boundary object (`Dio` / `http.Client` / `FirebaseFirestore` / 
 | R-b | Callables have no official fake; app error mapping must run. | **Resolved:** thin `CallableClient` facade; `FakeCallableClient` throws real `FirebaseFunctionsException` (public ctor confirmed). App mapping sits above the facade (D4). |
 | R-c | dio fake-adapter fidelity / `charlatan`. | **Resolved:** hand-roll `FakeHttpClientAdapter` against the confirmed stable interface; drop `charlatan`. |
 | R-d | Deterministic latency vs real app timers. | Demos avoid long repeating timers; `pumpUntil(finder, timeout, step)` is the sanctioned wait; never `pumpAndSettle`. Latency configurable. |
-| R-e | AC4 literal pass needs the external teroxx repo. | **Out of scope** for this local run; delivered as compatibility design + `docs/MIGRATION.md`. Flagged (A7) for a separate teroxx effort. |
+| R-e | AC4 literal pass needs the external reference-app repo. | **Out of scope** for this local run; delivered as compatibility design + `docs/MIGRATION.md`. Flagged (A7) for a separate reference-app effort. |
 | R-f | Pub-workspace + Firebase plugin interplay at Dart 3.12. | Phase 0 proves resolution before any code; Melos is the documented fallback (approach C) if friction appears. |
 | R-g | AC3 "zero robot change" literalness. | Mirror demo shares byte-identical shared-flow robots + identical key strings; `robots_parity_test` enforces equality mechanically. |
 
@@ -766,10 +766,10 @@ Root `README.md` (AC6) must contain these headed sections:
    `...IfPresent` (R5.3).
 4. **Migration note (AC6, R1.4)** — pointer to `docs/MIGRATION.md`: adopt Layer A helpers and
    Layer B adapters independently, in either order, alongside an existing hand-rolled harness;
-   the AC4 compatibility argument for teroxx.
+   the AC4 compatibility argument for the reference app.
 
 `docs/MIGRATION.md` details incremental adoption and the (out-of-scope) steps a separate
-teroxx effort would take to prove the literal AC4 green-suite.
+the reference app effort would take to prove the literal AC4 green-suite.
 
 ---
 
@@ -792,8 +792,8 @@ toward the simplest spec-compliant option.
   R6.2 wording.)
 - **A6 — Deferrals:** emulator mode (R6.3) and semantics finder (R4.5) are designed-for but not
   built (YAGNI).
-- **A7 — AC4 scope:** satisfied as **compatibility-design + docs**; a literal "teroxx suite
-  still green" pass requires committing to the external teroxx repo, which is **out of scope**
+- **A7 — AC4 scope:** satisfied as **compatibility-design + docs**; a literal "reference-app suite
+  still green" pass requires committing to the external reference-app repo, which is **out of scope**
   for this cascade_test-only, local-branch run. **Needs a human decision / separate effort** if
   a literal AC4 pass is required.
 - **A8 — AC3 mechanism:** mirrored demo with byte-identical shared-flow robots + identical key
@@ -820,17 +820,17 @@ toward the simplest spec-compliant option.
 
 ### Internal References
 
-- Requirements (source of truth): `teroxx/front_end/docs/test_harness_requirements.md`
+- Requirements (source of truth): `docs/test_harness_requirements.md`
   (R1.1–R7.3, AC1–AC6, D1–D5).
 - Brainstorm: `docs/brainstorm/2026-07-10-universal-flutter-acceptance-test-harness-brainstorm-doc.md`.
 - Run ledger: `docs/.wingspan-run.md`.
-- Prior-art harness: `teroxx/front_end/test/support/test_app.dart:68` (builder),
+- Prior-art harness: `reference-app/test/support/test_app.dart:68` (builder),
   `:428` (widget-build side effects — R3.2 anti-pattern), `:447-524` (stub application),
   `:499`/`:512` (reconstructed exceptions / `250` sentinel — D4 anti-pattern),
   `:641-937` (`WidgetTesterX` verbs to port), `:613` (`LoggingObserver`).
-- Prior-art robots: `teroxx/front_end/test/robots/auth_robot.dart:34` (login flow),
+- Prior-art robots: `reference-app/test/robots/auth_robot.dart:34` (login flow),
   `:56-62,89-91` (manual pump loops → `pumpUntil`); `.../robots/robots.dart` (barrel pattern).
-- Prior-art support: `teroxx/front_end/test/support/minimal_app.dart` (test app wrapper),
+- Prior-art support: `reference-app/test/support/minimal_app.dart` (test app wrapper),
   `.../widget_tester_x_test.dart` (verb tests to port),
   `.../base_client_stubs.dart` (default fixtures pattern).
 - Toolchain/cache facts: `~/.pub-cache/hosted/pub.dev/dio-5.9.2/lib/src/adapter.dart`,

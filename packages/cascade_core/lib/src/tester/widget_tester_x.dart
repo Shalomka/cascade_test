@@ -6,8 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// App-agnostic [WidgetTester] verbs for driving a full-system test by [Key]
-/// (R4.3). Ported from the Teroxx prior art and decoupled from app types:
-/// custom button/text widgets are resolved through [HarnessConfig] (R4.4).
+/// (R4.3). Generalized from an existing app-coupled test harness and decoupled
+/// from app types: custom button/text widgets are resolved through
+/// [HarnessConfig] (R4.4).
 ///
 /// These verbs never call `pumpAndSettle` (real apps have repeating timers);
 /// use [pumpUntil] to wait deterministically.

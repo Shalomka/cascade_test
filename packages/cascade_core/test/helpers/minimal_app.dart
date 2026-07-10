@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 /// A minimal, app-agnostic [MaterialApp] wrapper for exercising the harness's
-/// `WidgetTesterX` verbs in isolation (ported from the Teroxx prior art and
-/// decoupled from app theming/localization).
+/// `WidgetTesterX` verbs in isolation (decoupled from any app's theming or
+/// localization).
 class MinimalApp extends StatelessWidget {
   /// Wraps [child] in a scaffolded [MaterialApp].
   const MinimalApp({required this.child, super.key});

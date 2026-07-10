@@ -1,7 +1,7 @@
 # Wingspan Auto — Decision Log
 
 **Run:** Implement the Universal Flutter Acceptance-Test Harness
-(`teroxx/front_end/docs/test_harness_requirements.md`) inside `cascade_test`.
+(spec vendored at [`docs/test_harness_requirements.md`](test_harness_requirements.md)) inside `cascade_test`.
 **Result:** ✅ GOAL MET — local branch `feat/test-harness`, no PR (per your choice).
 **Date:** 2026-07-10
 
@@ -49,10 +49,10 @@ declared docs; 4 `no_forbidden_imports_test` guards + transport-free Layer A pub
 
 ## ⚠️ Deferred / needs your decision
 
-- **AC4 (Teroxx suite stays green) was NOT literally satisfied** — it requires the *external* `teroxx`
-  repo, which is out of scope for this `cascade_test`-only, local-branch run. Delivered instead as a
-  **compatibility design + `docs/MIGRATION.md`** (also satisfies AC6's migration-note requirement).
-  A real AC4 pass is a separate effort in the teroxx repo.
+- **AC4 (the reference app's existing suite stays green) was NOT literally satisfied** — it requires
+  that *external* app's repo, which is out of scope for this `cascade_test`-only, local-branch run.
+  Delivered instead as a **compatibility design + `docs/MIGRATION.md`** (also satisfies AC6's
+  migration-note requirement). A real AC4 pass is a separate effort in the reference app's repo.
 - **No PR / no remote** — you chose local-branch-only. To open a PR later: create a remote and push
   `feat/test-harness`.
 - Review **Suggestions S1–S5** left unaddressed (dead `FinderTextX` export, `useDio` eager-mutation vs

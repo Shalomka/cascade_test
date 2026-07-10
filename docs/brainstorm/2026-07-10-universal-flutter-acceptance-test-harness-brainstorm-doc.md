@@ -5,16 +5,16 @@ topic: universal-flutter-acceptance-test-harness
 
 # Universal Flutter Acceptance-Test Harness
 
-> Source of truth: `teroxx/front_end/docs/test_harness_requirements.md`
+> Source of truth: `docs/test_harness_requirements.md`
 > (R1.1–R7.3, AC1–AC6, D1–D5). Prior art read in full:
-> `teroxx/front_end/test/support/test_app.dart` (1020 LOC) + robots + stub defaults.
+> `reference-app/test/support/test_app.dart` (1020 LOC) + robots + stub defaults.
 > This brainstorm was produced **non-interactively**; every choice the skill would
 > normally have prompted for is recorded under **Auto-resolved Assumptions**.
 
 ## What We're Building
 
 A reusable, app-agnostic **system-test harness** for Flutter apps, extracted from
-the Teroxx `TestApp` prototype and generalized. A test pumps the *real* `App`
+the the reference app `TestApp` prototype and generalized. A test pumps the *real* `App`
 widget with all real wiring (interceptors, serialization, error mapping, blocs),
 and fakes only the outermost I/O boundary — HTTP transport, Firebase SDKs — so the
 system under test is "UI → real app → real transport plumbing → faked transport →
@@ -250,13 +250,13 @@ running the *same-shaped* flow (GET + POST 403→200 + assertions) but with the 
 transport. Only Layer B (`cascade_http`) and the Layer C `TestApp` wiring differ;
 Layer A and the robot code are unchanged. "Minimal" per the spec → likely no Firebase.
 
-**AC4 — Teroxx smoke (compatibility).** *Reachability caveat:* this pipeline is
+**AC4 — the reference app smoke (compatibility).** *Reachability caveat:* this pipeline is
 sandboxed to `cascade_test`, local-branch-only, and must not modify the external
-Teroxx repo. So AC4 is treated here as **design-for-compatibility + documentation**:
+the reference app repo. So AC4 is treated here as **design-for-compatibility + documentation**:
 `cascade_core` depends only on `flutter_test`/`meta` (no globals, no
 `Bloc.observer` hijack unless opted in), so it can be added to an app with an
 existing hand-rolled harness without collision (R1.4). The *actual* "existing suite
-still green" proof requires committing to Teroxx and is **out of scope** for this run
+still green" proof requires committing to the reference app and is **out of scope** for this run
 — flagged as an open question for the human (see Risks R-e).
 
 ## Riskiest / Most Uncertain Areas
@@ -279,7 +279,7 @@ still green" proof requires committing to Teroxx and is **out of scope** for thi
   tuning vs repeating timers vs asserting loading states is empirically fiddly per
   the prior art.
 - **R-e. AC4 reachability.** Cannot be literally satisfied without touching the
-  external Teroxx repo, which is out of scope for this local-branch-only run.
+  external reference-app repo, which is out of scope for this local-branch-only run.
 - **R-f. Pub-workspace + Flutter + Firebase-plugin interplay.** Shared lockfile with
   firebase platform-interface plugins is expected to work but is unverified at this
   Flutter/Dart version; melos is the fallback (approach C).
@@ -334,7 +334,7 @@ prompted, resolved toward the simplest spec-compliant option.
   "registry" — flagged for audit; supported by R6.1 vs R6.2 wording.)
 - **A6 — Deferrals:** emulator mode (R6.3) and semantics finder (R4.5) are stretch,
   designed-for but not implemented first pass.
-- **A7 — AC4:** satisfied as compatibility-design + docs; live Teroxx green-suite
+- **A7 — AC4:** satisfied as compatibility-design + docs; live the reference app green-suite
   proof is out of scope for this cascade_test-only, local-branch run. **Needs human
   decision** if a literal AC4 pass is required.
 - **A8 — AC3:** satisfied via a mirrored demo app so robot code ports verbatim.
@@ -345,7 +345,7 @@ prompted, resolved toward the simplest spec-compliant option.
 
 ## Open Questions
 
-- Does a literal **AC4** pass (Teroxx suite green with Layer A added) need to happen
+- Does a literal **AC4** pass (reference-app suite green with Layer A added) need to happen
   in this pipeline, or is compatibility-by-design + documentation acceptable? (A7)
 - Is `charlatan` compatible with dio 5.9 / Flutter 3.44, or do we hand-roll the fake
   `HttpClientAdapter`? (R-c/A4)

@@ -11,7 +11,7 @@ reviewer: Wingspan review stage (non-interactive, max effort)
 Scope: `git diff main...HEAD` on `feat/test-harness`, the six new packages under
 `packages/` (`cascade_core`, `cascade_dio`, `cascade_http`, `cascade_firebase`,
 `demo_dio_firebase`, `demo_http`). Judged against the spec
-(`teroxx/front_end/docs/test_harness_requirements.md`, R1.1–R7.3 / AC1–AC6 / D1–D5)
+(`docs/test_harness_requirements.md`, R1.1–R7.3 / AC1–AC6 / D1–D5)
 and the plan (`docs/plan/2026-07-10-feat-universal-flutter-acceptance-test-harness-plan.md`).
 
 ## Method
