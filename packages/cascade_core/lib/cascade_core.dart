@@ -15,5 +15,4 @@ export 'src/registry/missing_stub_error.dart';
 export 'src/registry/stub.dart';
 export 'src/registry/stub_registry.dart';
 export 'src/robot/robot.dart';
-export 'src/tester/finder_extensions.dart';
 export 'src/tester/widget_tester_x.dart';

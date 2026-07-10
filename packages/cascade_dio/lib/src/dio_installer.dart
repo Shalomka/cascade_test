@@ -9,9 +9,16 @@ extension DioInstaller on TestHarnessBuilder {
   ///
   /// Inject this exact [dio] (with the app's real interceptors) into the app
   /// under test so every interceptor, serializer and error mapper runs.
+  ///
+  /// Side-effect-free until `buildHarness`: the adapter swap is deferred to the
+  /// install step, matching `useHttpClient`/`useFirebase` and honoring R3.1's
+  /// "no side effects until build()" contract.
   void useDio(Dio dio) {
-    dio.httpClientAdapter = FakeHttpClientAdapter(registry);
-    addInstallStep((harness) => harness.put<Dio>(dio));
+    final registry = this.registry;
+    addInstallStep((harness) {
+      dio.httpClientAdapter = FakeHttpClientAdapter(registry);
+      harness.put<Dio>(dio);
+    });
   }
 }
 

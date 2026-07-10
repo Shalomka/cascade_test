@@ -6,5 +6,9 @@
 build/
 pubspec.lock
 
+# Generated Flutter plugin registrant metadata
+.flutter-plugins
+.flutter-plugins-dependencies
+
 # Test related
 coverage/
