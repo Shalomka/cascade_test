@@ -29,6 +29,12 @@ final class StubRegistry {
   /// The default per-stub latency, applied when an outcome sets none (R2.5).
   Duration defaultLatency = const Duration(milliseconds: 100);
 
+  /// Optional observer invoked after each successful resolution (R7.1).
+  ///
+  /// Used by the boundary log to print per-call diagnostics. Not called for
+  /// unmatched requests (those throw [MissingStubError]).
+  void Function(BoundaryRequest request, ResolvedOutcome outcome)? onResolved;
+
   /// All registered stubs, in registration order.
   List<Stub> get stubs => List<Stub>.unmodifiable(_stubs);
 
@@ -45,10 +51,12 @@ final class StubRegistry {
       final stub = _stubs[i];
       if (stub.matcher.matches(request)) {
         final outcome = stub.next();
-        return ResolvedOutcome(
+        final resolved = ResolvedOutcome(
           outcome: outcome,
           latency: outcome.latency ?? defaultLatency,
         );
+        onResolved?.call(request, resolved);
+        return resolved;
       }
     }
     throw MissingStubError(request);
