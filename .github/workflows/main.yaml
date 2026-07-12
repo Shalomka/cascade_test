@@ -23,7 +23,15 @@ jobs:
       modified_files_only: false
 
   build:
-    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/dart_package.yml@v1
+    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/flutter_package.yml@v1
     with:
-      dart_sdk: "3.12.0"
+      flutter_version: "3.44.4"
+      # The workspace root has no lib/test; format and analyze the whole repo.
+      format_directories: "."
+      analyze_directories: "."
+      # Pub-workspace monorepo: run every package's suite from the root.
+      test_recursion: true
+      # The 100% Layer A/B coverage target is a tracked known gap (README
+      # "Known gaps"); raise this once the gap closes.
+      min_coverage: 0
 
