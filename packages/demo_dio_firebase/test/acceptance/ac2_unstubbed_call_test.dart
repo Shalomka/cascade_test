@@ -16,7 +16,7 @@ void main() {
     final app = TestApp();
     await tester.pumpWidget(app.build());
 
-    // The migrated login verb is a chain; terminate it with `.run()`. The rest
+    // The login verb is a chain; terminate it with `.run()`. The rest
     // of this test keeps using the raw WidgetTesterX escape hatch (G7).
     await LoginRobot(tester).login().run();
 

@@ -2,6 +2,7 @@
 
 [![style: very good analysis][very_good_analysis_badge]][very_good_analysis_link]
 [![License: MIT][license_badge]][license_link]
+![Dart SDK][dart_sdk_badge]
 
 A reusable, app-agnostic **system-test harness** for Flutter apps, built as a
 pub-workspace monorepo. A test pumps the *real* `App` widget with all real
@@ -9,14 +10,60 @@ wiring (interceptors, serialization, error mapping, blocs) and fakes only the
 outermost I/O boundary (HTTP transport, Firebase SDKs). Configuration is a
 synchronous Dart-cascade builder; the UI is driven by `Key`s through BDD robots.
 
+The design goal is that the *same* robots, keys, and test body drive an app
+whether its transport is dio, `package:http`, or Firebase — you swap the
+transport adapter, nothing else.
+
+- [Status](#status)
+- [Packages](#packages)
+- [Install](#install)
+- [Usage](#usage)
+- [Adoption checklist](#adoption-checklist-make-your-app-injectable)
+- [Key convention](#key-convention)
+- [Writing robots (chainable DSL)](#writing-robots-chainable-dsl)
+
+## Status
+
+Merged to `main` (via PR #1) and green on every gate. Verified on
+**Flutter 3.44.4 / Dart 3.12.2**:
+
+| Gate | Result |
+|---|---|
+| `flutter pub get` (workspace root) | resolves the whole workspace |
+| `dart analyze` (root, `very_good_analysis`) | **No issues found** |
+| Test suite (all 6 packages) | **129 passing, 0 failing** |
+
+Per-package tests: `cascade_core` 91 · `cascade_dio` 12 · `cascade_http` 8 ·
+`cascade_firebase` 12 · `demo_dio_firebase` 2 · `demo_http` 4. CI (the VGV
+`dart_package` workflow) re-runs analyze + tests + coverage on every push and PR
+to `main`, alongside a semantic-PR check and a markdown spell-check.
+
+**Acceptance criteria** (see [docs/test_harness_requirements.md](docs/test_harness_requirements.md)):
+
+| AC | What it proves | State |
+|---|---|---|
+| AC1 | Full dio + Firebase flow: seeded Firestore, GET, POST `403→200`, callable error, robot login, keys-only driving, `expectCalledWith`. | Met — `demo_dio_firebase` |
+| AC2 | An unstubbed call fails fast with the method **and** full path. | Met — `demo_dio_firebase` |
+| AC3 | A `package:http` app passes the same-shaped test with only the transport swapped; robot code is byte-identical (machine-checked). | Met — `demo_http` |
+| AC4 | Layer A can be added to an app that already has its own harness without breaking it. | Design-level (verifying this literally needs an external app repo) |
+| AC5 | No Layer A/B file imports app, Firebase, dio, or http outside its adapter. | Met by construction (dependency graph) + guard tests |
+| AC6 | README documents adoption, key convention, and robots. | Met — this file |
+
+**Known gaps** (tracked, not blocking):
+
+- The plan's *100% Layer A/B line-coverage* target is not yet met (measured
+  ≈ 75.8% `cascade_core`, ≈ 75.6% `cascade_dio`). Some required-surface verbs
+  (`enterPin`/`submitText`, the boundary-log formatter) still ship untested.
+- Emulator mode (R6.3) and the semantics-label finder (R4.5) are deferred.
+
 ## Packages
 
 | Package | Layer | Purpose |
 |---|---|---|
-| `cascade_core` | A | Registry, cascade builder, `WidgetTesterX`, `Robot`, `HarnessConfig`, observability. App- and transport-agnostic. |
-| `cascade_dio` | B | Installs a `FakeHttpClientAdapter` wired to the shared registry. |
-| `cascade_http` | B | Installs a registry-backed `MockClient`. |
-| `cascade_firebase` | B | Callable facade + fake, and Firestore/Auth/Storage seeders. |
+| `cascade_core` | A | Registry, cascade builder, `WidgetTesterX`, `Robot`/`TesterRobot`, `HarnessConfig`, observability. App- and transport-agnostic. |
+| `cascade_dio` | B | `useDio(dio)` — installs a `FakeHttpClientAdapter` wired to the shared registry. |
+| `cascade_http` | B | `useHttpClient()` — installs a registry-backed `MockClient`. |
+| `cascade_firebase` | B | `useFirebase()` — callable facade + fake, and Firestore/Auth/Storage seeders. |
 | `demo_dio_firebase` | C | Real demo app proving AC1 (full flow) and AC2 (fail-fast). |
 | `demo_http` | C | Mirror demo proving AC3 (same flow, only the adapter swapped). |
 
@@ -25,33 +72,216 @@ dio/http/firebase, so a stray transport import in Layer A fails analysis before
 any test runs. A `no_forbidden_imports_test` in each Layer A/B package asserts
 the same invariant at the source level.
 
-## Quick start
+## Install
 
-```dart
-final app = TestApp() // extends TestHarnessBuilder; installs the adapters
-  ..withGet('/policies', data: policiesFixture)
-  ..withPostSequence('/orders', const [Res(403), Res(200, data: orderFixture)])
-  ..withCallable('createOrder', error: FunctionsError.permissionDenied)
-  ..withSignedInUser(uid: 'u1')
-  ..withCollection('users', [{'id': 'u1', 'name': 'Ada'}]);
+### Prerequisites
 
-await tester.pumpWidget(app.build());
+- **Flutter 3.44+** (Dart SDK **≥ 3.12** — every pubspec pins `sdk: ^3.12.0`).
+  The repo uses [pub workspaces][pub_workspaces_link], so one resolution covers
+  every package.
+- Optional: the [Very Good CLI][very_good_cli_link] (`very_good test`) for
+  recursive test runs and coverage, matching this project's tooling.
 
-// One fluent chain, drained once by `.run()`; hop robots with `.on()`.
-await LoginRobot(tester)
-    .login()
-    .on(TesterRobot(tester))
-    .tap(PoliciesKeys.loadButton)
-    .pumpUntilVisible(PoliciesKeys.result)
-    .expectText(PoliciesKeys.result, 'Policies: 2')
-    .run();
+### Work on this repo (run the demos & tests)
 
-// Eager registry assertions run AFTER the drain so they see the chain's effects.
-app.expectCalledWith('/orders', (body) => body is Map && body['sku'] == 'x');
+```sh
+git clone <this-repo-url> cascade_test
+cd cascade_test
+
+# One resolution at the workspace root wires up all six packages.
+flutter pub get
+
+# Static analysis across the whole workspace.
+dart analyze
+
+# Run a package's suite.
+cd packages/demo_dio_firebase && flutter test
+
+# …or run everything with coverage via the Very Good CLI.
+very_good test --recursive
 ```
 
-Resolve everything with a single `flutter pub get` at the workspace root, then
-run tests per package with the very_good_cli `test` tool (or `flutter test`).
+### Adopt the harness in your app
+
+The packages are `publish_to: none` (not on pub.dev), so depend on them from a
+Git ref (or vendor them into your own workspace). They are **test-only** — add
+them under `dev_dependencies` so no production code depends on the harness:
+
+```yaml
+dev_dependencies:
+  cascade_core:
+    git:
+      url: <this-repo-url>
+      path: packages/cascade_core
+  cascade_dio:        # or cascade_http / cascade_firebase — whichever transports you use
+    git:
+      url: <this-repo-url>
+      path: packages/cascade_dio
+```
+
+Then make your `App` injectable (see the [adoption
+checklist](#adoption-checklist-make-your-app-injectable)) and write a thin
+Layer C `TestApp` (see [Usage](#usage)). Layer A (`cascade_core`) and the
+Layer B adapters are independent — add only the transports your app uses.
+
+## Usage
+
+### Anatomy of a harness test
+
+Every test follows the same four beats:
+
+1. **Build** a Layer C `TestApp` (a `TestHarnessBuilder` subclass that installs
+   the transport adapters your app uses).
+2. **Program** the shared registry with a synchronous cascade — HTTP stubs,
+   Firebase seeds, callable stubs.
+3. **Pump** the *real* `App`, injecting the faked boundaries.
+4. **Drive** the UI with robots (keys only) and **assert** — UI text through the
+   chain, then eager registry assertions after the chain drains.
+
+```dart
+// test/support/test_app.dart — the one Layer C seam per app.
+class TestApp extends TestHarnessBuilder {
+  TestApp() {
+    withDefaultLatency(const Duration(milliseconds: 5));
+    useDio(createAppDio()); // your real Dio, with its real interceptors
+    useFirebase();
+  }
+
+  Widget build() {
+    final harness = buildHarness();
+    return App(
+      dio: harness.dio,
+      firestore: harness.firestore,
+      auth: harness.auth,
+      callableClient: harness.callableClient,
+    );
+  }
+}
+```
+
+### A complete example
+
+```dart
+testWidgets('AC1: full dio + Firebase acceptance flow', (tester) async {
+  final app = TestApp()
+    ..withSignedInUser(uid: 'u1')
+    ..withCollection('users', [{'id': 'u1', 'name': 'Ada'}])
+    ..withGet('/policies', data: policiesFixture)
+    ..withPostSequence('/orders', const [Res(403), Res(200, data: {'id': 'o1'})])
+    ..withCallable('createOrder', error: FunctionsError.permissionDenied);
+
+  await tester.pumpWidget(app.build());
+
+  // One fluent chain, drained once by `.run()`; hop robots with `.on()`.
+  await LoginRobot(tester)
+      .login()
+      .on(TesterRobot(tester))
+      .tap(PoliciesKeys.loadButton)
+      .pumpUntilVisible(PoliciesKeys.result)
+      .expectText(PoliciesKeys.result, 'Policies: 2')
+      .on(OrdersRobot(tester))
+      .submitOrder()
+      .expectOrder('o1')
+      .run();
+
+  // Eager registry assertions run AFTER the drain so they see the chain's effects.
+  app
+    ..expectCalledWith('/orders', (body) => body is Map && body['sku'] == 'sku-123',
+        method: 'POST')
+    ..expectCalled('/orders', method: 'POST', times: 2);
+});
+```
+
+See [packages/demo_dio_firebase](packages/demo_dio_firebase) for the full,
+runnable reference (app wiring in `lib/app/app.dart`, harness in
+`test/support/test_app.dart`, flows in `test/acceptance/`).
+
+### Transport installers
+
+Call one installer per transport your app uses, then read the faked boundary
+back off the built harness and inject it into your real `App`:
+
+| Installer (cascade verb) | Package | Reads back as |
+|---|---|---|
+| `useDio(Dio dio)` | `cascade_dio` | `harness.dio` |
+| `useHttpClient()` | `cascade_http` | `harness.httpClient` |
+| `useFirebase()` | `cascade_firebase` | `harness.firestore`, `harness.auth`, `harness.storage`, `harness.callableClient` |
+| `useInstaller(TransportInstaller)` / `addInstallStep(InstallStep)` | `cascade_core` | (custom transport seam) |
+
+Installers are **deferred**: the adapter swap and seeding run inside
+`buildHarness()`, never at cascade-call time (R3.1/R3.2), so the builder stays
+side-effect-free until you build.
+
+### The cascade builder — verb reference
+
+All verbs live on `TestHarnessBuilder` (Layer B packages add theirs by
+extension) and mutate the one shared registry. They read as a `..withX()`
+cascade.
+
+**HTTP stubs** (`cascade_core`):
+
+| Verb | Effect |
+|---|---|
+| `withGet(path, {data, statusCode = 200, query, latency})` | Stub a `GET`. |
+| `withPost(path, {data, statusCode = 200, latency})` | Stub a `POST`. |
+| `withPut(path, …)` / `withDelete(path, …)` | Stub a `PUT` / `DELETE`. |
+| `withGetSequence(path, List<Res>)` | `GET` whose successive calls return the sequence in order (R2.6). |
+| `withPostSequence(path, List<Res>)` | `POST` sequence — e.g. `[Res(403), Res(200, data: …)]`. |
+| `withStub(Stub)` | Register an arbitrary matcher/outcome (escape hatch). |
+
+`Res(statusCode, {data, latency})` is the shorthand for one stubbed response
+(status may be non-2xx — the adapter surfaces it as a *real* transport response
+so your production error mapping runs).
+
+**Firebase seeds & callables** (`cascade_firebase`):
+
+| Verb | Effect |
+|---|---|
+| `withSignedInUser({uid = 'test-uid', email, claims})` | Seed a signed-in user. |
+| `withSignedOutUser()` | Seed a signed-out state. |
+| `withCollection(path, List<Map>)` | Seed a Firestore collection (a `String` `'id'` becomes the doc id). |
+| `withDocument(path, Map)` | Seed a single document at an explicit path. |
+| `withStorageObject(path, contents)` | Seed a fake storage object. |
+| `withCallable(name, {data, error})` | Stub a callable to return `data`, or throw a real `FirebaseFunctionsException` for `error` (`FunctionsError.permissionDenied`, …). |
+
+**Call recording** (`cascade_core`) — these assert **immediately**, so call them
+*after* the chain has drained:
+
+| Verb | Effect |
+|---|---|
+| `expectCalled(endpoint, {method, times})` | Assert an endpoint was called (optionally N times). |
+| `expectNeverCalled(endpoint, {method})` | Assert it was never called. |
+| `expectCalledWith(endpoint, bool Function(body), {method})` | Assert some call carried a matching body. |
+
+**Observability & config** (`cascade_core`):
+
+| Verb | Effect |
+|---|---|
+| `withObserver(BlocObserver)` | Install a `Bloc.observer` at build time — opt-in, never hijacked (AC4). |
+| `withBoundaryLog()` | Log every resolved boundary call (`[boundary] GET /x -> status 200`). |
+| `withDefaultLatency(Duration)` | Set the default per-stub latency (R2.5). |
+| `withConfig(HarnessConfig)` | Register app-specific button/text resolvers read by the tester verbs (R4.4). |
+
+**Build:**
+
+| Verb | Effect |
+|---|---|
+| `buildHarness()` | Init the binding, install observer/config, run every queued install step, return the populated `Harness`. Plain Dart — never a widget `build`. |
+| `buildHarnessAsync()` | `buildHarness()` then `await harness.whenReady` — use when a test reads seeded Firestore/Storage state **before** pumping, so seeds are committed (and any seeding error surfaces) first. |
+
+### Running the tests
+
+`flutter pub get` at the workspace root resolves everything at once. Then run
+per package with `flutter test`, or across all packages with the Very Good CLI:
+
+```sh
+flutter pub get                       # once, at the workspace root
+cd packages/cascade_core && flutter test
+very_good test --recursive            # all packages
+very_good test --coverage             # with coverage (per package)
+```
+
+Firebase tests use in-memory fakes, so **no emulator or network is required**.
 
 ## Adoption checklist (make your app injectable)
 
@@ -68,7 +298,10 @@ every boundary object — the harness swaps the transport, nothing else:
       transport boundary so the harness never reconstructs app exceptions (D4).
 - [ ] Callable-error mapping lives **above** the `CallableClient` facade.
 
-See `packages/demo_dio_firebase/lib/app/app.dart` for a reference wiring.
+See [packages/demo_dio_firebase/lib/app/app.dart](packages/demo_dio_firebase/lib/app/app.dart)
+for a reference wiring. The demo also owns its `CallableClient` facade and
+bridges it to the harness in `test/support/test_app.dart`, so production code
+never depends on the harness.
 
 ## Key convention
 
@@ -115,6 +348,12 @@ await login
     .on(orders).submitOrder().expectOrder('o1')
     .run();
 ```
+
+The base `Robot` verbs are `expectVisible`, `expectNotVisible`, `expectText`,
+`tap`, `enterText`, `pumpUntilVisible`, and `tapIfPresent`, plus `step`, `on`,
+and `run`. `TesterRobot` adds the remaining low-level `WidgetTesterX` verbs
+(`enterPin`, `submitText`, `expectInputHasText`, `expectInputHasFocus`,
+`expectButtonEnabled`, `expectButtonDisabled`).
 
 ### `.on()`, `.run()`, and `TesterRobot`
 
@@ -172,14 +411,10 @@ the raw `WidgetTesterX` extension both remain available for breakpoint-level
 debugging. Conditional steps are explicit `...IfPresent` verbs (R5.3). Wait for
 state with `pumpUntil`, never `pumpAndSettle` (real apps have repeating timers).
 
-## Migration note
-
-Adopt the Layer A helpers and the Layer B adapters **independently, in either
-order**, alongside an existing hand-rolled harness. See
-[docs/MIGRATION.md](docs/MIGRATION.md) for the incremental adoption path and the
-AC4 compatibility argument.
-
 [license_badge]: https://img.shields.io/badge/license-MIT-blue.svg
 [license_link]: https://opensource.org/licenses/MIT
 [very_good_analysis_badge]: https://img.shields.io/badge/style-very_good_analysis-B22C89.svg
 [very_good_analysis_link]: https://pub.dev/packages/very_good_analysis
+[dart_sdk_badge]: https://img.shields.io/badge/Dart%20SDK-%5E3.12-0175C2.svg
+[pub_workspaces_link]: https://dart.dev/tools/pub/workspaces
+[very_good_cli_link]: https://pub.dev/packages/very_good_cli
