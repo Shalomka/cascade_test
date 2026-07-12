@@ -60,11 +60,11 @@ void main() {
         expect(emissions, contains('v2'));
       });
 
-      test("propagates the fake's not-found error for a missing doc", () {
+      test("propagates the fake's not-found error for a missing doc", () async {
         final harness = builder.buildHarness();
 
-        expect(
-          () => harness.updateDocument('messages/missing', {'text': 'x'}),
+        await expectLater(
+          harness.updateDocument('messages/missing', {'text': 'x'}),
           throwsA(
             isA<FirebaseException>().having(
               (e) => e.code,
@@ -198,7 +198,7 @@ void main() {
     });
 
     group('path validation', () {
-      test('document verbs reject a collection-shaped path', () {
+      test('document verbs reject a collection-shaped path', () async {
         final harness = builder.buildHarness();
 
         for (final (verb, call) in <(String, Future<void> Function())>[
@@ -206,8 +206,8 @@ void main() {
           ('updateDocument', () => harness.updateDocument('messages', {})),
           ('deleteDocument', () => harness.deleteDocument('messages')),
         ]) {
-          expect(
-            call,
+          await expectLater(
+            call(),
             throwsA(
               isA<ArgumentError>().having(
                 (e) => e.message,
@@ -219,11 +219,11 @@ void main() {
         }
       });
 
-      test('addToCollection rejects a document-shaped path', () {
+      test('addToCollection rejects a document-shaped path', () async {
         final harness = builder.buildHarness();
 
-        expect(
-          () => harness.addToCollection('messages/m1', {}),
+        await expectLater(
+          harness.addToCollection('messages/m1', {}),
           throwsA(
             isA<ArgumentError>().having(
               (e) => e.message,
@@ -234,15 +234,15 @@ void main() {
         );
       });
 
-      test('empty and malformed paths throw naming the verb', () {
+      test('empty and malformed paths throw naming the verb', () async {
         final harness = builder.buildHarness();
 
-        expect(
-          () => harness.pushDocument('', {}),
+        await expectLater(
+          harness.pushDocument('', {}),
           throwsA(isA<ArgumentError>()),
         );
-        expect(
-          () => harness.deleteDocument('messages//m1'),
+        await expectLater(
+          harness.deleteDocument('messages//m1'),
           throwsA(
             isA<ArgumentError>().having(
               (e) => e.message,

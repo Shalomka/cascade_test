@@ -15,26 +15,9 @@ class TestApp extends TestHarnessBuilder {
     useHttpClient();
   }
 
-  Harness? _harness;
-
-  /// The harness built by [build], for post-build emit verbs.
-  ///
-  /// Calling [build] again replaces it (last build wins), matching a re-pump.
-  /// Throws a descriptive [StateError] when accessed before [build].
-  Harness get harness {
-    final built = _harness;
-    if (built == null) {
-      throw StateError(
-        'TestApp.harness accessed before build(). '
-        'Call pumpWidget(app.build()) first.',
-      );
-    }
-    return built;
-  }
-
   /// Builds the real mirror app widget with the installed client injected.
   Widget build() {
-    final harness = _harness = buildHarness();
+    final harness = buildHarness();
     return App(httpClient: harness.httpClient);
   }
 }
