@@ -43,6 +43,29 @@ extension WidgetTesterX on WidgetTester {
     );
   }
 
+  /// Pumps in [step] increments until [finder] stops matching or [timeout]
+  /// elapses.
+  ///
+  /// The mirror image of [pumpUntil]: waits for a *removal* (a deleted row, a
+  /// dismissed gate) that lands on a later microtask. Deterministic
+  /// (count-based) and never `pumpAndSettle`.
+  Future<void> pumpUntilAbsent(
+    Finder finder, {
+    Duration timeout = const Duration(seconds: 10),
+    Duration step = const Duration(milliseconds: 100),
+  }) async {
+    final maxIterations = (timeout.inMilliseconds / step.inMilliseconds).ceil();
+    for (var i = 0; i < maxIterations; i++) {
+      if (finder.evaluate().isEmpty) return;
+      await pump(step);
+    }
+    if (finder.evaluate().isEmpty) return;
+    fail(
+      'pumpUntilAbsent timed out after ${timeout.inMilliseconds}ms waiting '
+      'for removal of: ${finder.describeMatch(Plurality.zero)}',
+    );
+  }
+
   /// Asserts a widget with [key] is present.
   Future<WidgetTester> expectWidget(Key key) async {
     expect(find.byKey(key), findsOneWidget);

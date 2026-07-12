@@ -18,7 +18,7 @@ import 'package:meta/meta.dart';
 /// stay fully typed across base + domain verbs. A two-level hierarchy loses
 /// subclass verbs mid-chain; keep robots one level, or make an intermediate
 /// generic too (`abstract class BaseAppRobot<S extends BaseAppRobot<S>>
-/// extends Robot<S>`). See `docs/MIGRATION.md`.
+/// extends Robot<S>`).
 ///
 /// Chaining is additive and opt-in: a single-verb chain terminated with
 /// `.run()` and the raw [WidgetTesterX] extension both remain available as the
@@ -115,6 +115,17 @@ abstract class Robot<Self extends Robot<Self>> {
   }) => step(
     'pumpUntilVisible($key)',
     () => tester.pumpUntil(find.byKey(key), timeout: timeout),
+  );
+
+  /// Waits until the widget with [key] disappears (deterministic; never
+  /// settle). The mirror image of [pumpUntilVisible].
+  @useResult
+  Self pumpUntilGone(
+    Key key, {
+    Duration timeout = const Duration(seconds: 10),
+  }) => step(
+    'pumpUntilGone($key)',
+    () => tester.pumpUntilAbsent(find.byKey(key), timeout: timeout),
   );
 
   /// Taps the widget with [key] only if it is currently present (R5.3).

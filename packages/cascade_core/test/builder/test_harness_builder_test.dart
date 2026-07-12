@@ -144,6 +144,32 @@ void main() {
       expect(harness.registry, same(builder.registry));
     });
 
+    test('harness throws a descriptive StateError before buildHarness', () {
+      final builder = TestHarnessBuilder();
+
+      expect(
+        () => builder.harness,
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('before build'),
+          ),
+        ),
+      );
+    });
+
+    test('harness returns the built container; last build wins', () {
+      final builder = TestHarnessBuilder();
+
+      final first = builder.buildHarness();
+      expect(builder.harness, same(first));
+
+      final second = builder.buildHarness();
+      expect(builder.harness, same(second));
+      expect(second, isNot(same(first)));
+    });
+
     test('useInstaller runs a TransportInstaller at build time (AC3 seam)', () {
       final builder = TestHarnessBuilder()
         ..useInstaller(const _MarkerInstaller());

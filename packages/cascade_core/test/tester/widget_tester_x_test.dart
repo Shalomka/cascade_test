@@ -29,6 +29,29 @@ class _DelayedRevealState extends State<_DelayedReveal> {
       _visible ? const SizedBox(key: Key('revealed')) : const SizedBox.shrink();
 }
 
+class _DelayedHide extends StatefulWidget {
+  const _DelayedHide();
+
+  @override
+  State<_DelayedHide> createState() => _DelayedHideState();
+}
+
+class _DelayedHideState extends State<_DelayedHide> {
+  bool _visible = true;
+
+  @override
+  void initState() {
+    super.initState();
+    Timer(const Duration(milliseconds: 250), () {
+      if (mounted) setState(() => _visible = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      _visible ? const SizedBox(key: Key('doomed')) : const SizedBox.shrink();
+}
+
 void main() {
   tearDown(resetHarnessConfig);
 
@@ -219,6 +242,45 @@ void main() {
       try {
         await tester.pumpUntil(
           find.byKey(const Key('never')),
+          timeout: const Duration(milliseconds: 300),
+        );
+      } on TestFailure catch (error) {
+        caught = error;
+      }
+
+      expect(caught, isA<TestFailure>());
+    });
+
+    testWidgets('pumpUntilAbsent waits for a delayed removal', (tester) async {
+      await tester.pumpWidget(const MinimalApp(child: _DelayedHide()));
+      expect(find.byKey(const Key('doomed')), findsOneWidget);
+
+      await tester.pumpUntilAbsent(find.byKey(const Key('doomed')));
+
+      expect(find.byKey(const Key('doomed')), findsNothing);
+    });
+
+    testWidgets('pumpUntilAbsent returns immediately for an absent finder', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const MinimalApp(child: SizedBox(key: Key('box'))),
+      );
+
+      await tester.pumpUntilAbsent(find.byKey(const Key('never-there')));
+    });
+
+    testWidgets('pumpUntilAbsent fails when the widget never disappears', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const MinimalApp(child: SizedBox(key: Key('box'))),
+      );
+
+      Object? caught;
+      try {
+        await tester.pumpUntilAbsent(
+          find.byKey(const Key('box')),
           timeout: const Duration(milliseconds: 300),
         );
       } on TestFailure catch (error) {

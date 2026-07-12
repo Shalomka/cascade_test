@@ -50,6 +50,23 @@ class TestHarnessBuilder {
   BlocObserver? _observer;
   HarnessConfig? _config;
   bool _boundaryLog = false;
+  Harness? _builtHarness;
+
+  /// The harness returned by the last [buildHarness] call, so a test can drive
+  /// post-build emit verbs (`app.harness.pushDocument(...)`) after pumping.
+  ///
+  /// Building again replaces it (last build wins), matching a re-pump. Throws
+  /// a descriptive [StateError] when accessed before [buildHarness].
+  Harness get harness {
+    final built = _builtHarness;
+    if (built == null) {
+      throw StateError(
+        'TestHarnessBuilder.harness accessed before build. '
+        'Call buildHarness() (e.g. pumpWidget(app.build())) first.',
+      );
+    }
+    return built;
+  }
 
   // --- HTTP verbs (R2) -------------------------------------------------------
 
@@ -200,7 +217,7 @@ class TestHarnessBuilder {
 
     if (_boundaryLog) registry.onResolved = logBoundaryCall;
 
-    final harness = Harness(registry);
+    final harness = _builtHarness = Harness(registry);
     for (final step in _installSteps) {
       final result = step(harness);
       if (result is Future<void>) harness.registerPending(result);
