@@ -25,18 +25,35 @@ void main() {
 
     await tester.pumpWidget(app.build());
 
-    // Log in via the shared robot; drive by keys only.
-    await LoginRobot(tester).login();
-
-    // GET /policies renders the seeded count.
-    await tester.tapButton(PoliciesKeys.loadButton);
-    await tester.pumpUntil(find.byKey(PoliciesKeys.result));
-    await tester.expectText(PoliciesKeys.result, 'Policies: 2');
-
-    // POST /orders returns 403 then 200 via the retry interceptor (R2.6).
+    final login = LoginRobot(tester);
+    final policies = TesterRobot(tester);
     final orders = OrdersRobot(tester);
-    await orders.submitOrder();
-    await orders.expectOrder('o1');
+    final profile = ProfileRobot(tester);
+
+    // The whole flow reads as one cross-robot chain, hopping robots with
+    // `.on()` on a single shared queue, drained once by `.run()` (C1):
+    //   login → policies (raw tester verbs) → orders → profile.
+    await login
+        .login()
+        .on(policies)
+        // GET /policies renders the seeded count. The policies step joins the
+        // chain via TesterRobot instead of raw eager `tester.*` (C2).
+        .tap(PoliciesKeys.loadButton)
+        .pumpUntilVisible(PoliciesKeys.result)
+        .expectText(PoliciesKeys.result, 'Policies: 2')
+        // POST /orders returns 403 then 200 via the retry interceptor (R2.6).
+        .on(orders)
+        .submitOrder()
+        .expectOrder('o1')
+        // Firestore-seeded profile + a callable error mapped above the facade.
+        .on(profile)
+        .expectName('Ada')
+        .triggerCallable()
+        .expectError('permission-denied')
+        .run();
+
+    // Eager registry assertions run AFTER the drain so they observe the
+    // chain's effects (composition rule for eager assertions, R7/flow-gap #6).
     app
       ..expectCalledWith(
         '/orders',
@@ -44,11 +61,5 @@ void main() {
         method: 'POST',
       )
       ..expectCalled('/orders', method: 'POST', times: 2);
-
-    // Firestore-seeded profile + a callable error mapped above the facade (D4).
-    final profile = ProfileRobot(tester);
-    await profile.expectName('Ada');
-    await profile.triggerCallable();
-    await profile.expectError('permission-denied');
   });
 }

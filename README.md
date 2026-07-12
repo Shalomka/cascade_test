@@ -36,9 +36,17 @@ final app = TestApp() // extends TestHarnessBuilder; installs the adapters
   ..withCollection('users', [{'id': 'u1', 'name': 'Ada'}]);
 
 await tester.pumpWidget(app.build());
-await LoginRobot(tester).login();
-await tester.tapButton(PoliciesKeys.loadButton);
-await tester.expectText(PoliciesKeys.result, 'Policies: 2');
+
+// One fluent chain, drained once by `.run()`; hop robots with `.on()`.
+await LoginRobot(tester)
+    .login()
+    .on(TesterRobot(tester))
+    .tap(PoliciesKeys.loadButton)
+    .pumpUntilVisible(PoliciesKeys.result)
+    .expectText(PoliciesKeys.result, 'Policies: 2')
+    .run();
+
+// Eager registry assertions run AFTER the drain so they see the chain's effects.
 app.expectCalledWith('/orders', (body) => body is Map && body['sku'] == 'x');
 ```
 
@@ -77,29 +85,92 @@ abstract final class PoliciesKeys {
 Use identical `ValueKey` string values across apps that should share robots.
 Never drive tests by widget type or text — always by key.
 
-## Writing robots
+## Writing robots (chainable DSL)
 
-`Robot` (Layer A) holds the `WidgetTester` and exposes key-driven verbs.
-Per-app robots extend it and compose domain flows so tests read Given/When/Then
-with **no raw `find.byType`/`tester.tap`** (R5.2):
+`Robot<Self>` (Layer A) holds the `WidgetTester` and exposes key-driven verbs.
+Each verb **enqueues** a labeled step onto a shared lazy queue and returns the
+concrete robot, so a multi-step flow reads as one fluent expression. **Nothing
+runs until a terminal `.run()`** drains the queue in order. Per-app robots
+extend it and compose domain flows so tests read Given/When/Then with **no raw
+`find.byType`/`tester.tap`** (R5.2):
 
 ```dart
-class LoginRobot extends Robot {
+class LoginRobot extends Robot<LoginRobot> {
   LoginRobot(super.tester);
+  static const emailField = Key('email_input');
   static const loginButton = Key('login_button');
   static const homePage = Key('home_page');
 
-  Future<void> login({String email = 'a@b.c', String password = 'pw'}) async {
-    await tester.enterTextByKey(Key('email_input'), email);
-    await tester.tapButton(loginButton);
-    await tester.pumpUntil(find.byKey(homePage)); // never pumpAndSettle
-  }
+  // A verb enqueues via primitives and returns `self`; it never awaits
+  // `tester.*` directly. `@useResult` makes a never-run chain a static error.
+  @useResult
+  LoginRobot login({String email = 'a@b.c', String password = 'pw'}) =>
+      enterText(emailField, email).tap(loginButton).pumpUntilVisible(homePage);
 }
+
+// A whole scenario is one expression. `.on(robot)` hops to another robot on the
+// SAME shared queue; `.run()` drains everything once, in order:
+await login
+    .login()
+    .on(orders).submitOrder().expectOrder('o1')
+    .run();
 ```
 
-Conditional steps are explicit `...IfPresent` verbs (R5.3), e.g.
-`robot.tapIfPresent(key)`. Wait for state with `pumpUntil`, never
-`pumpAndSettle` (real apps have repeating timers).
+### `.on()`, `.run()`, and `TesterRobot`
+
+- **`.on(next)`** transfers the active queue to `next` (which must share the
+  same tester) and returns it, so single- and multi-robot tests read
+  identically. There is no `Scenario` type.
+- **`.run()`** is the only awaitable in a chain. A failing step throws a
+  `ChainStepError` naming `step i/n · <label>` and appends the original matcher
+  diff. A second `.run()` on the *same* drained queue throws `StateError`; a
+  reused robot instance starts a fresh queue for its next chain.
+- **`TesterRobot`** shares the base verb vocabulary and adds the remaining
+  low-level `WidgetTesterX` verbs (input focus/content, button state, pin entry,
+  keyboard submit), so bare-tester interactions join the same engine instead of
+  interleaving eager `tester.*` calls with a lazy chain.
+
+### Verb Authoring Contract
+
+1. A verb **enqueues via `step(...)`/primitives and returns `self`** — it never
+   `await`s `tester.*` directly, so per-step labels survive.
+2. A composite verb calls the robot's own primitives so each sub-action is its
+   own labeled step (`login()` → four steps, not one). If a primitive is
+   missing (e.g. "pump until a text string appears"), enqueue it with a labeled
+   `step(...)` rather than an unlabeled `tester.*` call.
+3. Any **find/branch on tree state goes inside the thunk** (run time), never at
+   enqueue time — `tapIfPresent` is the canonical example (R5.3).
+4. Argument **values** are captured at call time; **tree state** is read at run
+   time.
+5. **Never use `..` cascades on robots** — a cascade discards each verb's
+   returned `self` (and `..run()` discards the future), so the lints below may
+   not fire. Use `.` chaining.
+
+### One-level CRTP rule
+
+`Robot<Self extends Robot<Self>>` requires each concrete robot to be a **single
+leaf** — `class LoginRobot extends Robot<LoginRobot>`. A two-level hierarchy
+loses subclass verbs mid-chain; keep robots one level, or make the intermediate
+generic too (`abstract class BaseAppRobot<S extends BaseAppRobot<S>> extends
+Robot<S>`).
+
+### Static safety (why chaining has no footguns)
+
+The analyzer closes all three misuse shapes — verified by a `dart analyze`
+fixture test (CH-AC3):
+
+| Misuse | Caught by |
+| --- | --- |
+| chain built, never `.run()` | `@useResult` on every verb → *result discarded* |
+| `await robot.verb();` reflex | `await_only_futures` (a robot is not a `Future`) |
+| `.run()` never awaited | `unawaited_futures` / `discarded_futures` |
+
+### Escape hatch
+
+Chaining is additive and opt-in: a single-verb chain (`robot.verb().run()`) and
+the raw `WidgetTesterX` extension both remain available for breakpoint-level
+debugging. Conditional steps are explicit `...IfPresent` verbs (R5.3). Wait for
+state with `pumpUntil`, never `pumpAndSettle` (real apps have repeating timers).
 
 ## Migration note
 

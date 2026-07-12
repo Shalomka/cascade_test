@@ -22,16 +22,22 @@ void main() {
 
     await tester.pumpWidget(app.build());
 
-    // The exact same LoginRobot as the dio demo.
-    await LoginRobot(tester).login();
-
-    await tester.tapButton(PoliciesKeys.loadButton);
-    await tester.pumpUntil(find.byKey(PoliciesKeys.result));
-    await tester.expectText(PoliciesKeys.result, 'Policies: 2');
-
+    final login = LoginRobot(tester);
+    final policies = TesterRobot(tester);
     final orders = OrdersRobot(tester);
-    await orders.submitOrder();
-    await orders.expectOrder('o1');
+
+    // The same cross-robot chain shape as the dio demo (minus profile), driving
+    // the byte-identical LoginRobot/OrdersRobot and the same keys (AC3/C1).
+    await login
+        .login()
+        .on(policies)
+        .tap(PoliciesKeys.loadButton)
+        .pumpUntilVisible(PoliciesKeys.result)
+        .expectText(PoliciesKeys.result, 'Policies: 2')
+        .on(orders)
+        .submitOrder()
+        .expectOrder('o1')
+        .run();
 
     app
       ..expectCalledWith(

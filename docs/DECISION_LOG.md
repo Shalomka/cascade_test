@@ -70,3 +70,43 @@ declared docs; 4 `no_forbidden_imports_test` guards + transport-free Layer A pub
    before the first pump, so the determinism fix actually applies in practice.
 
 _Full stage-by-stage audit trail: `docs/.wingspan-run.md`. Review report: `docs/review/`._
+
+---
+
+## Amendment — Chainable Robot & Scenario DSL (2026-07-10)
+
+**Feature:** an opt-in fluent chaining layer on the robot/tester surface
+(`docs/plan/2026-07-10-feat-chainable-robot-scenario-dsl-plan.md`). All new
+types live in Layer A `cascade_core`; no transport package or `HarnessConfig`
+was touched (AC5 preserved by construction and re-verified).
+
+**Amends R3.3 / D5 (does not delete).** R3.3 banned the
+`extension on Future<WidgetTester>` *mirror* because it duplicated every verb and
+raced on a forgotten `await`. This design honors R3.3's **intent** — verbs
+defined once, on a CRTP base — while enabling chaining, and closes both footguns
+statically: a lazy step-queue drained by a mandatory `.run()`, with
+`await_only_futures` / `@useResult` / `unawaited_futures` catching the three
+misuse shapes (proven by the CH-AC3 `dart analyze` fixture test). Imperative
+line-by-line usage and the raw `WidgetTesterX` extension remain valid (opt-in
+coexistence, G7).
+
+**New decisions recorded:**
+
+1. **Lazy queue + mandatory `.run()`** (A2/N1) — no bare-await robot, no
+   `Future<void>` shim (local-branch harness, no external consumers).
+2. **CRTP self-type + typed `.on<R>()`** — one engine for single-robot chains,
+   cross-robot scenarios, and the new `TesterRobot`; no `Scenario` type.
+   `TesterRobot` shares the base's single verb vocabulary and adds only the
+   tester verbs the base lacks (input focus/content, button state, pin, submit)
+   — no parallel/duplicate naming (review consolidation).
+3. **`ChainStepError` step-context output** (C3) — names `step i/n · <label>`
+   and preserves the original stack + matcher diff via
+   `Error.throwWithStackTrace`.
+4. **Lifecycle** (A4/A5) — a verb starts a fresh context when the current one is
+   null or consumed (robot reuse); a consumed `ChainContext` re-run throws
+   `StateError`; an empty `.run()` is a no-op; `.on()` asserts a shared tester
+   and no pending target chain.
+5. **Demos rewritten as full cross-robot chains** (C1); the byte-identical robot
+   parity test (AC3) stays green **unmodified**.
+6. **`useResult` re-exported from `cascade_core`** so robot authors can annotate
+   domain verbs (the never-run static guard) without a direct `meta` dependency.

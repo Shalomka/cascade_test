@@ -4,12 +4,16 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../helpers/minimal_app.dart';
 
-class _ScreenRobot extends Robot {
+class _ScreenRobot extends Robot<_ScreenRobot> {
   _ScreenRobot(super.tester);
 
   static const title = Key('title');
   static const cta = Key('cta');
   static const optional = Key('optional');
+
+  /// A composite domain verb: taps the CTA then waits for the optional widget.
+  /// Composed from primitives so each sub-action is its own labeled step (A3).
+  _ScreenRobot revealOptional() => tap(cta).pumpUntilVisible(optional);
 }
 
 class _Screen extends StatefulWidget {
@@ -40,31 +44,65 @@ class _ScreenState extends State<_Screen> {
 
 void main() {
   group('Robot', () {
-    testWidgets('exposes key-driven expect and tap verbs (R5.1)', (
+    testWidgets('a chain of verbs drives a real tree end-to-end (R5.1)', (
       tester,
     ) async {
       await tester.pumpWidget(const MinimalApp(child: _Screen()));
+
+      await _ScreenRobot(tester)
+          .expectVisible(_ScreenRobot.title)
+          .expectText(_ScreenRobot.title, 'Welcome')
+          .expectNotVisible(_ScreenRobot.optional)
+          .tap(_ScreenRobot.cta)
+          .expectVisible(_ScreenRobot.optional)
+          .run();
+    });
+
+    testWidgets('verbs enqueue lazily and run drains in order', (tester) async {
+      await tester.pumpWidget(const MinimalApp(child: _Screen()));
       final robot = _ScreenRobot(tester);
 
-      await robot.expectVisible(_ScreenRobot.title);
-      await robot.expectText(_ScreenRobot.title, 'Welcome');
-      await robot.expectNotVisible(_ScreenRobot.optional);
+      // Enqueue three steps without running. Capturing the returned robot
+      // satisfies `@useResult`; the chain is drained below via `run()`.
+      final built = robot
+          .expectVisible(_ScreenRobot.title)
+          .tap(_ScreenRobot.cta)
+          .expectVisible(_ScreenRobot.optional);
+      expect(identical(built, robot), isTrue, reason: 'verbs return self');
 
-      await robot.tap(_ScreenRobot.cta);
+      expect(robot.context.length, 3, reason: 'steps enqueue synchronously');
+      // The tap has not executed yet: the optional widget must be absent.
+      expect(find.byKey(_ScreenRobot.optional), findsNothing);
 
-      await robot.expectVisible(_ScreenRobot.optional);
+      await robot.run();
+
+      expect(find.byKey(_ScreenRobot.optional), findsOneWidget);
     });
+
+    testWidgets(
+      'a composite verb enqueues one labeled step per primitive (A3)',
+      (tester) async {
+        await tester.pumpWidget(const MinimalApp(child: _Screen()));
+        final robot = _ScreenRobot(tester).revealOptional();
+
+        // revealOptional() composes tap + pumpUntilVisible → two labeled steps.
+        expect(robot.context.length, 2);
+
+        await robot.run();
+        expect(find.byKey(_ScreenRobot.optional), findsOneWidget);
+      },
+    );
 
     testWidgets('tapIfPresent is a no-op when the widget is absent (R5.3)', (
       tester,
     ) async {
       await tester.pumpWidget(const MinimalApp(child: _Screen()));
-      final robot = _ScreenRobot(tester);
 
       // The optional widget is not present yet: this must not throw.
-      await robot.tapIfPresent(_ScreenRobot.optional);
-
-      await robot.expectNotVisible(_ScreenRobot.optional);
+      await _ScreenRobot(tester)
+          .tapIfPresent(_ScreenRobot.optional)
+          .expectNotVisible(_ScreenRobot.optional)
+          .run();
     });
   });
 }

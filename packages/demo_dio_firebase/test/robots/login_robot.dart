@@ -1,10 +1,9 @@
 import 'package:cascade_core/cascade_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
 
 /// Shared login flow robot. Byte-identical across the dio and http demos so
 /// AC3 holds with zero robot change.
-class LoginRobot extends Robot {
+class LoginRobot extends Robot<LoginRobot> {
   /// Creates a [LoginRobot] driving [tester].
   LoginRobot(super.tester);
 
@@ -20,14 +19,19 @@ class LoginRobot extends Robot {
   /// The home page key (shown after a successful login).
   static const homePage = Key('home_page');
 
-  /// Enters credentials, submits, and waits for the home page.
-  Future<void> login({
+  /// Enters the email and password credentials (one labeled step each).
+  @useResult
+  LoginRobot enterCreds(String email, String password) =>
+      enterText(emailField, email).enterText(passwordField, password);
+
+  /// Submits the form and waits for the home page (never `pumpAndSettle`).
+  @useResult
+  LoginRobot submit() => tap(loginButton).pumpUntilVisible(homePage);
+
+  /// Enters default credentials and submits, waiting for the home page.
+  @useResult
+  LoginRobot login({
     String email = 'ada@example.com',
     String password = 'password123',
-  }) async {
-    await tester.enterTextByKey(emailField, email);
-    await tester.enterTextByKey(passwordField, password);
-    await tester.tapButton(loginButton);
-    await tester.pumpUntil(find.byKey(homePage));
-  }
+  }) => enterCreds(email, password).submit();
 }

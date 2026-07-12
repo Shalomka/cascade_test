@@ -44,6 +44,42 @@ Once a test file's routes are all expressed through the registry, delete its
 dependency on the old harness. Do this file-by-file; the two harnesses can
 coexist indefinitely.
 
+## Migrating a robot suite to the chainable DSL
+
+The `Robot` base is chainable: verbs enqueue labeled steps and return the
+concrete robot, and a terminal `.run()` drains the queue. Migrating an existing
+imperative robot suite is mechanical:
+
+1. **Make the robot a CRTP leaf.** `class LoginRobot extends Robot` becomes
+   `class LoginRobot extends Robot<LoginRobot>`. Keep robots one level deep (see
+   the one-level rule in the root README).
+2. **Rewrite each verb to enqueue and return `self`.** Replace
+   `Future<void> verb() async { await tester.x(); await tester.y(); }` with an
+   expression that composes the base primitives:
+   `@useResult LoginRobot verb() => enterText(...).tap(...).pumpUntilVisible(...);`
+   Each primitive is its own labeled step, so failure messages stay granular.
+   Annotate domain verbs `@useResult` (re-exported from `cascade_core`) so a
+   never-run chain is a static error.
+3. **Move any find/branch inside a `step(...)` thunk** so it evaluates at drain
+   time, not enqueue time. Prefer explicit `...IfPresent` verbs.
+4. **Terminate every chain with `.run()`** and hop robots with `.on(next)`.
+   Place eager registry assertions (`app.expectCalled*`) *after* the awaited
+   `.run()` so they observe the drained chain's effects.
+5. **Drive bare-tester steps through `TesterRobot`** instead of interleaving raw
+   `tester.*` calls with a lazy chain.
+
+### The one pitfall — and the lint that catches it
+
+The muscle-memory reflex `await robot.verb();` is a **no-op**: a verb returns the
+robot (not a `Future`), so `await` does nothing and the step never runs. This is
+exactly the forgotten-`await` footgun the old `extension on Future<WidgetTester>`
+mirror suffered — but here the analyzer catches it. Under `very_good_analysis`,
+`await_only_futures` flags `await` on a non-`Future`, `@useResult` flags a chain
+that is built but never run, and `unawaited_futures` flags a `.run()` whose
+future is dropped. A `dart analyze` fixture test (CH-AC3) proves all three fire.
+Never use `..` cascades on robots — they discard the returned `self` and can
+suppress these lints.
+
 ## AC4 compatibility argument (why the existing suite stays green)
 
 Adding Layer A beside an existing harness is non-breaking by construction:
