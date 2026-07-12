@@ -55,17 +55,20 @@ class _ScreenState extends State<_Screen> {
   }
 }
 
-/// Captured from the first test so the cross-tester `.on()` guard (CH-AC7) has
-/// a robot bound to a genuinely different [WidgetTester]. Only its identity is
-/// compared — it is never driven after its own test ends.
-late WidgetTester _firstTester;
+/// A stand-in with a distinct identity for the cross-tester `.on()` guard
+/// (CH-AC7). The guard only compares tester identity, so no member is ever
+/// invoked. Self-contained on purpose: capturing another test's tester made
+/// CH-AC7 order-dependent, which `--test-randomize-ordering-seed` exposes.
+class _ForeignTester implements WidgetTester {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 void main() {
   group('Robot chain lifecycle', () {
     testWidgets('CH-AC1: a single-robot chain runs in enqueue order', (
       tester,
     ) async {
-      _firstTester = tester;
       await tester.pumpWidget(const MinimalApp(child: _Screen()));
 
       await _ScreenRobot(tester)
@@ -135,7 +138,7 @@ void main() {
     ) async {
       await tester.pumpWidget(const MinimalApp(child: _Screen()));
       final onThisTester = _ScreenRobot(tester);
-      final onOtherTester = _OtherRobot(_firstTester);
+      final onOtherTester = _OtherRobot(_ForeignTester());
 
       expect(
         () => onThisTester.on(onOtherTester),
