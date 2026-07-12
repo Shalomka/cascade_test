@@ -1,0 +1,27 @@
+name: cascade_firebase
+description: Firebase transport adapter and seeders for the cascade harness.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  cascade_core:
+    path: ../cascade_core
+  cloud_firestore: ^6.6.0
+  cloud_functions: ^6.3.3
+  fake_cloud_firestore: ^4.1.1
+  firebase_auth: ^6.5.4
+  firebase_auth_mocks: ^0.15.0
+  firebase_core: ^4.11.0
+  firebase_storage: ^13.4.0
+  firebase_storage_mocks: ^0.8.0
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  very_good_analysis: ^10.3.0

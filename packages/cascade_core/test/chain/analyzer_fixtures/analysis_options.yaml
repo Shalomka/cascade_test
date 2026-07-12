@@ -1,0 +1,7 @@
+# Local ruleset for the CH-AC3 analyzer fixtures.
+#
+# These fixtures intentionally contain the three chain-misuse shapes so the
+# CH-AC3 test can assert `dart analyze` flags each. The parent package excludes
+# this directory from its own analysis (see ../../../analysis_options.yaml), so
+# these deliberate violations never break the package-level gate.
+include: package:very_good_analysis/analysis_options.yaml

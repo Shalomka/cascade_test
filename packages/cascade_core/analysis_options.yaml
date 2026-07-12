@@ -1,0 +1,8 @@
+include: package:very_good_analysis/analysis_options.yaml
+
+analyzer:
+  exclude:
+    # The CH-AC3 fixtures intentionally contain chain-misuse lint violations.
+    # They carry their own analysis_options.yaml and are analyzed on demand by
+    # analyzer_guard_test.dart; excluding them keeps the package gate green.
+    - test/chain/analyzer_fixtures/**

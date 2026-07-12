@@ -1,0 +1,30 @@
+name: demo_dio_firebase
+description: Demo app proving AC1/AC2 with dio + Firebase transports.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  bloc: ^9.2.0
+  cloud_firestore: ^6.6.0
+  cloud_functions: ^6.3.3
+  dio: ^5.9.0
+  firebase_auth: ^6.5.4
+  firebase_core: ^4.11.0
+  flutter:
+    sdk: flutter
+  flutter_bloc: ^9.1.0
+
+dev_dependencies:
+  cascade_core:
+    path: ../cascade_core
+  cascade_dio:
+    path: ../cascade_dio
+  cascade_firebase:
+    path: ../cascade_firebase
+  flutter_test:
+    sdk: flutter
+  very_good_analysis: ^10.3.0
