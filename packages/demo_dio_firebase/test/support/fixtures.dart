@@ -13,4 +13,10 @@ abstract final class Fixtures {
 
   /// A seeded user document.
   static const Map<String, dynamic> user = {'id': 'u1', 'name': 'Ada'};
+
+  /// Two seeded live messages with explicit ids so row keys are deterministic.
+  static const List<Map<String, dynamic>> messages = [
+    {'id': 'm1', 'text': 'first message'},
+    {'id': 'm2', 'text': 'second message'},
+  ];
 }

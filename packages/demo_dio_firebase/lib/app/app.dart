@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo_dio_firebase/api/api_client.dart';
 import 'package:demo_dio_firebase/features/login/login_cubit.dart';
 import 'package:demo_dio_firebase/features/login/login_page.dart';
+import 'package:demo_dio_firebase/features/messages/messages_page.dart';
 import 'package:demo_dio_firebase/features/orders/orders_page.dart';
 import 'package:demo_dio_firebase/features/policies/policies_page.dart';
 import 'package:demo_dio_firebase/features/profile/profile_page.dart';
@@ -89,6 +90,7 @@ class _HomePage extends StatelessWidget {
               auth: auth,
               callableClient: callableClient,
             ),
+            MessagesPage(firestore: firestore, auth: auth),
           ],
         ),
       ),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cascade_core/cascade_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -37,6 +39,42 @@ class _ScreenState extends State<_Screen> {
           child: const Text('Continue'),
         ),
         if (_tapped) const SizedBox(key: _ScreenRobot.optional),
+      ],
+    );
+  }
+}
+
+/// A screen whose banner disappears on a later frame after tapping dismiss,
+/// so waiting for the removal genuinely requires pumping.
+class _DismissScreen extends StatefulWidget {
+  const _DismissScreen();
+
+  static const banner = Key('banner');
+  static const dismiss = Key('dismiss');
+
+  @override
+  State<_DismissScreen> createState() => _DismissScreenState();
+}
+
+class _DismissScreenState extends State<_DismissScreen> {
+  bool _visible = true;
+
+  void _scheduleDismiss() {
+    Timer(const Duration(milliseconds: 250), () {
+      if (mounted) setState(() => _visible = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        if (_visible) const SizedBox(key: _DismissScreen.banner),
+        ElevatedButton(
+          key: _DismissScreen.dismiss,
+          onPressed: _scheduleDismiss,
+          child: const Text('Dismiss'),
+        ),
       ],
     );
   }
@@ -92,6 +130,17 @@ void main() {
         expect(find.byKey(_ScreenRobot.optional), findsOneWidget);
       },
     );
+
+    testWidgets('pumpUntilGone waits for a delayed removal', (tester) async {
+      await tester.pumpWidget(const MinimalApp(child: _DismissScreen()));
+
+      await _ScreenRobot(tester)
+          .expectVisible(_DismissScreen.banner)
+          .tap(_DismissScreen.dismiss)
+          .pumpUntilGone(_DismissScreen.banner)
+          .expectNotVisible(_DismissScreen.banner)
+          .run();
+    });
 
     testWidgets('tapIfPresent is a no-op when the widget is absent (R5.3)', (
       tester,

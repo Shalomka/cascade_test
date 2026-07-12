@@ -30,9 +30,26 @@ class TestApp extends TestHarnessBuilder {
     useFirebase();
   }
 
+  Harness? _harness;
+
+  /// The harness built by [build], for post-build emit verbs.
+  ///
+  /// Calling [build] again replaces it (last build wins), matching a re-pump.
+  /// Throws a descriptive [StateError] when accessed before [build].
+  Harness get harness {
+    final built = _harness;
+    if (built == null) {
+      throw StateError(
+        'TestApp.harness accessed before build(). '
+        'Call pumpWidget(app.build()) first.',
+      );
+    }
+    return built;
+  }
+
   /// Builds the real app widget with the installed fakes injected.
   Widget build() {
-    final harness = buildHarness();
+    final harness = _harness = buildHarness();
     return App(
       dio: harness.dio,
       firestore: harness.firestore,

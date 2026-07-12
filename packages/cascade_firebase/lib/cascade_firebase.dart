@@ -9,3 +9,4 @@ export 'src/firebase_installer.dart';
 export 'src/firestore_seeder.dart';
 export 'src/functions_error.dart';
 export 'src/storage_seeder.dart';
+export 'src/stream_verbs.dart';
