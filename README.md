@@ -14,6 +14,13 @@ The design goal is that the *same* robots, keys, and test body drive an app
 whether its transport is dio, `package:http`, or Firebase — you swap the
 transport adapter, nothing else.
 
+It runs entirely in the `flutter_test` widget-test runtime — headless, fast,
+and deterministic — and is **not** an on-device or end-to-end tool (it does
+not replace `integration_test` or `patrol`); see
+[What it is (and is not)](#what-it-is-and-is-not) for the exact scope.
+
+- [Motivation](#motivation)
+- [What it is (and is not)](#what-it-is-and-is-not)
 - [Status](#status)
 - [Packages](#packages)
 - [Install](#install)
@@ -29,6 +36,92 @@ transport adapter, nothing else.
 - [Adoption checklist](#adoption-checklist-make-your-app-injectable)
 - [Key convention](#key-convention)
 - [Writing robots (chainable DSL)](#writing-robots-chainable-dsl)
+
+## Motivation
+
+Flutter's test tooling is strong at the two ends of the pyramid and thin in the
+middle:
+
+- **Isolated unit / bloc tests** (`bloc_test`, `mocktail`) are fast and precise,
+  but they *mock the collaborators*. Your real interceptors, JSON
+  serialization, retry logic, and error mapping never run — so a whole class of
+  wiring bugs (an interceptor that never runs, a serialization step that drops
+  a field, a `403` mapped to the wrong app error) stays green and ships. The
+  assertions also verify the *mock's* behavior, which drifts from production
+  over time.
+- **On-device end-to-end tests** (`integration_test`, `patrol`, `maestro`) are
+  faithful but expensive: they need an emulator or device, run in minutes, flake
+  on timing and network, and make deterministic failure injection (force a
+  `403→200` retry, or a `permissionDenied` callable) awkward.
+
+The high-value middle — **pump the real app, fake only the outermost I/O
+boundary** — is real but usually hand-rolled per app: a bespoke Dio adapter
+here, a `fake_cloud_firestore` seed there, a home-grown robot with no static
+safety, rebuilt once per transport and once per project.
+
+Cascade Test standardizes that middle tier. One shared registry backs every
+transport, one synchronous cascade programs it, and one key-driven robot
+vocabulary drives the UI — so a test runs **as fast and deterministically as a
+widget test while exercising as much real code as an integration test**. Because
+only the transport is faked, your production error mapping runs for real (a
+non-2xx arrives as a real transport response; a failed callable throws the real
+`FirebaseFunctionsException`) instead of being reconstructed by a mock. Swap
+`useDio` for `useHttpClient` and the same robots, keys, and test body keep
+working, so the investment carries across apps and transport migrations.
+
+## What it is (and is not)
+
+Cascade Test runs **entirely in the `flutter_test` widget-test runtime** —
+headless, in-process, with no device or emulator. "Acceptance" here means
+*app-level behavioral*, verified in that runtime; it does **not** mean
+device-verified. It is an orchestration layer built **on top of** the standard
+fakes (`fake_cloud_firestore`, `firebase_auth_mocks`, `firebase_storage_mocks`,
+Dio's `HttpClientAdapter`, `package:http`'s `MockClient`), not a
+rewrite of them.
+
+**It is:**
+
+- An **app-level acceptance / system-test harness** that pumps the *real* `App`
+  with real wiring (interceptors, serialization, error mapping, blocs) and fakes
+  only the outermost HTTP / Firebase boundary.
+- **Fast, headless, and deterministic** — no network, no emulator, no device;
+  `pumpUntil`, never `pumpAndSettle`.
+- **Transport-agnostic** — the same robots, keys, and test body drive dio,
+  `package:http`, and Firebase; you swap only the adapter (AC3).
+- A **shared `StubRegistry` + synchronous cascade builder + statically-safe,
+  key-driven robot DSL** — `@useResult` chains that cannot silently do nothing.
+- A tool for **deterministic failure injection** — force `403→200` retries,
+  callable errors (`permissionDenied`, …), latency, and mid-test Firebase
+  stream emissions.
+
+**It is not:**
+
+- **Not an on-device / end-to-end tool, and not a replacement for
+  `integration_test`, `patrol`, or `maestro`.** It never runs on a real device
+  or emulator.
+- **Not a test of anything below the faked boundary** — the real network stack,
+  Firestore security rules, platform channels, permissions, push notifications,
+  deep links, webviews, and native / plugin behavior are all out of scope; cover
+  those with a thin on-device E2E layer on top.
+- **Not a mocking library** — it fakes the transport boundary rather than
+  mocking your repositories or cubits; there is no `when()` / `verify()` on
+  collaborators.
+- **Not a unit-test framework** — it complements, and does not replace,
+  `bloc_test` / `mocktail` unit tests; keep those for branch-level logic.
+- **Not a golden / visual-regression tool** — no pixel or golden testing; pair
+  with `alchemist` or `golden_toolkit` for that.
+- **Not a raw WebSocket / SSE / gRPC-stream harness** — reactive updates are
+  modeled as Firebase streams (`.snapshots()`, `authStateChanges()`) only.
+- **Not yet on pub.dev** — consumed via a Git dependency (`v0.1.0`,
+  `publish_to: none`).
+
+**Where it fits:**
+
+| Tier | Tools | Runs on | Speed | Fidelity |
+|---|---|---|---|---|
+| Unit / state | `test`, `bloc_test` + `mocktail` | Dart VM, headless | Fastest | Collaborators mocked |
+| **App / acceptance** | **Cascade Test** | **Widget-test runtime, headless** | **Fast** | **Real app; only I/O faked** |
+| End-to-end | `integration_test`, `patrol`, `maestro` | Device / emulator | Slow | Everything real |
 
 ## Status
 

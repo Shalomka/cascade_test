@@ -16,6 +16,10 @@
   ],
   "useGitignore": true,
   "words": [
-    "cascade_test"
+    "cascade_test",
+    "gRPC",
+    "mocktail",
+    "SSE",
+    "webviews"
   ]
 }
