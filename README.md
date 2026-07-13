@@ -18,6 +18,14 @@ transport adapter, nothing else.
 - [Packages](#packages)
 - [Install](#install)
 - [Usage](#usage)
+- [Testing by boundary](#testing-by-boundary)
+  - [Stubbing (the registry model)](#stubbing-the-registry-model)
+  - [HTTP & dio testing](#http--dio-testing)
+  - [Firebase testing](#firebase-testing)
+  - [Firebase function (callable) testing](#firebase-function-callable-testing)
+  - [Live streams & WebSockets](#live-streams--websockets)
+  - [Build & observability verbs](#build--observability-verbs)
+  - [Running the tests](#running-the-tests)
 - [Adoption checklist](#adoption-checklist-make-your-app-injectable)
 - [Key convention](#key-convention)
 - [Writing robots (chainable DSL)](#writing-robots-chainable-dsl)
@@ -212,28 +220,92 @@ Installers are **deferred**: the adapter swap and seeding run inside
 `buildHarness()`, never at cascade-call time (R3.1/R3.2), so the builder stays
 side-effect-free until you build.
 
-### The cascade builder — verb reference
+## Testing by boundary
 
-All verbs live on `TestHarnessBuilder` (Layer B packages add theirs by
-extension) and mutate the one shared registry. They read as a `..withX()`
-cascade.
+One shared `StubRegistry` backs every transport, so the five surfaces below all
+program the same builder and drain through the same chain. Verbs live on
+`TestHarnessBuilder` (Layer B packages add theirs by extension) and read as a
+`..withX()` cascade; the adapter swap and seeding are **deferred** to
+`buildHarness()`, never run at cascade-call time (R3.1/R3.2).
 
-**HTTP stubs** (`cascade_core`):
+### Stubbing (the registry model)
+
+Every faked boundary — an HTTP request, a callable, a Firestore read — resolves
+through one `StubRegistry`. A `withX()` verb registers a **stub** (a matcher plus
+an outcome); at run time the adapter builds a `BoundaryRequest`, the registry
+resolves it to either a `RespondWith` (data) or a `FailWith` (a *real* transport
+error), and the call is **recorded** for later assertion.
+
+- **`Res(statusCode, {data, latency})`** — the shorthand for one stubbed
+  response. A non-2xx status is surfaced as a real transport response so your
+  production error mapping runs (D4) — the harness never synthesizes an app
+  exception.
+- **Sequences** — `withGetSequence(path, List<Res>)` /
+  `withPostSequence(path, List<Res>)` return successive `Res`es across repeated
+  calls to the same path (R2.6), e.g. `[Res(403), Res(200, data: {...})]` for a
+  retry.
+- **`withStub(Stub)`** — the escape hatch: register an arbitrary matcher/outcome
+  when no `withX` verb fits.
+- **Latency** — `withDefaultLatency(Duration)` sets the per-stub default (R2.5);
+  a verb's own `latency:` overrides it.
+
+**Recording & assertions** (`cascade_core`) — these assert **immediately**, so
+call them *after* the chain has drained:
+
+| Verb | Effect |
+|---|---|
+| `expectCalled(endpoint, {method, times})` | Assert an endpoint was called (optionally N times). |
+| `expectNeverCalled(endpoint, {method})` | Assert it was never called. |
+| `expectCalledWith(endpoint, bool Function(body), {method})` | Assert some call carried a matching body. |
+
+Turn on `withBoundaryLog()` to print every resolved call
+(`[boundary] GET /x -> status 200`) while debugging.
+
+### HTTP & dio testing
+
+Two Layer B adapters share the **exact same** HTTP stub verbs — the only
+difference is the installer and the boundary you read back. Program with the
+transport-agnostic verbs; swap `useDio` ↔ `useHttpClient` and nothing else
+changes (AC3, machine-checked byte-for-byte by `demo_http`).
+
+| Installer | Package | Reads back as |
+|---|---|---|
+| `useDio(Dio dio)` | `cascade_dio` | `harness.dio` (your real Dio, with its real interceptors) |
+| `useHttpClient()` | `cascade_http` | `harness.httpClient` |
+
+**HTTP stub verbs** (`cascade_core`, shared by both adapters):
 
 | Verb | Effect |
 |---|---|
 | `withGet(path, {data, statusCode = 200, query, latency})` | Stub a `GET`. |
 | `withPost(path, {data, statusCode = 200, latency})` | Stub a `POST`. |
 | `withPut(path, …)` / `withDelete(path, …)` | Stub a `PUT` / `DELETE`. |
-| `withGetSequence(path, List<Res>)` | `GET` whose successive calls return the sequence in order (R2.6). |
-| `withPostSequence(path, List<Res>)` | `POST` sequence — e.g. `[Res(403), Res(200, data: …)]`. |
-| `withStub(Stub)` | Register an arbitrary matcher/outcome (escape hatch). |
+| `withGetSequence(path, List<Res>)` | Successive `GET`s return the sequence in order. |
+| `withPostSequence(path, List<Res>)` | `POST` sequence, e.g. `[Res(403), Res(200)]`. |
 
-`Res(statusCode, {data, latency})` is the shorthand for one stubbed response
-(status may be non-2xx — the adapter surfaces it as a *real* transport response
-so your production error mapping runs).
+```dart
+final app = TestApp()
+  ..withGet('/policies', data: policiesFixture)
+  ..withPostSequence('/orders', const [Res(403), Res(200, data: {'id': 'o1'})]);
+// … pump, drive, then assert the recorded calls:
+app.expectCalled('/orders', method: 'POST', times: 2);
+```
 
-**Firebase seeds & callables** (`cascade_firebase`):
+An **unstubbed** call fails fast with the method **and** full path (AC2) rather
+than hanging or returning null, so a missing stub is an immediate, legible
+error. Reference: [demo_dio_firebase](packages/demo_dio_firebase) (dio) and
+[demo_http](packages/demo_http) (the `package:http` mirror).
+
+### Firebase testing
+
+`useFirebase()` installs in-memory Firestore / Auth / Storage fakes plus the
+callable fake, all wired to the shared registry — **no emulator or network
+required** (R6.3 emulator mode is deferred). Read the faked boundaries back off
+the built harness (`harness.firestore`, `harness.auth`, `harness.storage`,
+`harness.callableClient`) and inject them into your real `App`.
+
+**Seed verbs** set *initial* state (for live *updates* mid-test, see
+[Live streams & WebSockets](#live-streams--websockets)):
 
 | Verb | Effect |
 |---|---|
@@ -242,32 +314,77 @@ so your production error mapping runs).
 | `withCollection(path, List<Map>)` | Seed a Firestore collection (a `String` `'id'` becomes the doc id). |
 | `withDocument(path, Map)` | Seed a single document at an explicit path. |
 | `withStorageObject(path, contents)` | Seed a fake storage object. |
-| `withCallable(name, {data, error})` | Stub a callable to return `data`, or throw a real `FirebaseFunctionsException` for `error` (`FunctionsError.permissionDenied`, …). |
 
-**Call recording** (`cascade_core`) — these assert **immediately**, so call them
-*after* the chain has drained:
+If a test reads seeded state **before** pumping, build with `buildHarnessAsync()`
+so seeds are committed (and any seeding error surfaces) first. Reference:
+`test/acceptance/ac1_full_flow_test.dart`.
+
+### Firebase function (callable) testing
+
+Callables flow through the same registry as HTTP, but the app talks to them
+through an **app-owned `CallableClient` facade** — the SDK's `FirebaseFunctions`
+/ `HttpsCallableResult` have private constructors and cannot be faked directly.
+Production wires `FirebaseCallableClient(FirebaseFunctions.instance)`; the
+harness injects a registry-backed `FakeCallableClient`, read back as
+`harness.callableClient`.
 
 | Verb | Effect |
 |---|---|
-| `expectCalled(endpoint, {method, times})` | Assert an endpoint was called (optionally N times). |
-| `expectNeverCalled(endpoint, {method})` | Assert it was never called. |
-| `expectCalledWith(endpoint, bool Function(body), {method})` | Assert some call carried a matching body. |
+| `withCallable(name, {data})` | Stub the callable to return `data`. |
+| `withCallable(name, {error})` | Throw a **real** `FirebaseFunctionsException` carrying `error.code`. |
 
-**Observability & config** (`cascade_core`):
+`error` is a `FunctionsError`: `permissionDenied`, `unauthenticated`,
+`notFound`, `invalidArgument`, `unavailable`, `internal`, `cancelled`, or
+`unknown`. Because a `FailWith` throws the real SDK exception, your
+**callable-error mapping stays above the facade** and runs unchanged (D4) — just
+as `ApiException.fromDio` sits above dio:
+
+```dart
+final app = TestApp()
+  ..withCallable('createOrder', error: FunctionsError.permissionDenied);
+// ProfileCubit.createOrder() catches FirebaseFunctionsException and emits
+// error.code — the harness never reconstructs the app's mapped error.
+```
+
+Reference: the `createOrder` callable in
+[profile_cubit.dart](packages/demo_dio_firebase/lib/features/profile/profile_cubit.dart)
+and its scenario in `test/acceptance/ac1_full_flow_test.dart`.
+
+### Live streams & WebSockets
+
+The harness has no raw WebSocket transport; **reactive/live updates are modeled
+as Firebase streams** — Firestore `.snapshots()` and `authStateChanges()` — which
+cover the same "server pushes, the UI re-renders" testing need. The `withX` seed
+verbs set the *initial* snapshot; these **post-build emit verbs**
+(`FirebaseStreamVerbs` on `Harness`) push *updates* mid-test so live listeners
+in the pumped app receive them:
 
 | Verb | Effect |
 |---|---|
-| `withObserver(BlocObserver)` | Install a `Bloc.observer` at build time — opt-in, never hijacked (AC4). |
-| `withBoundaryLog()` | Log every resolved boundary call (`[boundary] GET /x -> status 200`). |
-| `withDefaultLatency(Duration)` | Set the default per-stub latency (R2.5). |
-| `withConfig(HarnessConfig)` | Register app-specific button/text resolvers read by the tester verbs (R4.4). |
+| `pushDocument(path, data)` | Upsert a document; live snapshots emit. |
+| `updateDocument(path, data)` | Update an existing doc (throws not-found like real Firestore). |
+| `deleteDocument(path)` | Delete a doc; snapshots emit the removal. |
+| `addToCollection(path, data)` | Add an auto-id doc; **returns the new id** for keys-only waits. |
+| `emitSignIn({uid, email, claims})` | Sign in mid-test; `authStateChanges()` emits the user. |
+| `emitSignOut()` | Sign out mid-test; `authStateChanges()` emits `null`. |
 
-**Build:**
+Each verb awaits `Harness.whenReady` before touching the fake, so an emit can
+never interleave with pending seed writes. **Writes commit on a later
+microtask** — `await` the verb, then `pumpUntil` / `pumpUntilRowGone` the UI
+change; never `pumpAndSettle` (real apps have repeating timers). Note that
+`authStateChanges()` is a broadcast stream with no replay to late listeners, so
+gate the initial render on `auth.currentUser`, not the stream. Full reference:
+`test/acceptance/ac4_live_streams_test.dart` and
+[messages_cubit.dart](packages/demo_dio_firebase/lib/features/messages/messages_cubit.dart).
+
+### Build & observability verbs
 
 | Verb | Effect |
 |---|---|
 | `buildHarness()` | Init the binding, install observer/config, run every queued install step, return the populated `Harness`. Plain Dart — never a widget `build`. |
 | `buildHarnessAsync()` | `buildHarness()` then `await harness.whenReady` — use when a test reads seeded Firestore/Storage state **before** pumping, so seeds are committed (and any seeding error surfaces) first. |
+| `withObserver(BlocObserver)` | Install a `Bloc.observer` at build time — opt-in, never hijacked (AC4). |
+| `withConfig(HarnessConfig)` | Register app-specific button/text resolvers read by the tester verbs (R4.4). |
 
 ### Running the tests
 
