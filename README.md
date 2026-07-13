@@ -132,10 +132,10 @@ Merged to `main` (via PR #1) and green on every gate. Verified on
 |---|---|
 | `flutter pub get` (workspace root) | resolves the whole workspace |
 | `dart analyze` (root, `very_good_analysis`) | **No issues found** |
-| Test suite (all 6 packages) | **129 passing, 0 failing** |
+| Test suite (all 6 packages) | **170 passing, 0 failing** |
 
-Per-package tests: `cascade_core` 91 · `cascade_dio` 12 · `cascade_http` 8 ·
-`cascade_firebase` 12 · `demo_dio_firebase` 2 · `demo_http` 4. CI (the VGV
+Per-package tests: `cascade_core` 102 · `cascade_dio` 13 · `cascade_http` 9 ·
+`cascade_firebase` 28 · `demo_dio_firebase` 14 · `demo_http` 4. CI (the VGV
 `dart_package` workflow) re-runs analyze + tests + coverage on every push and PR
 to `main`, alongside a semantic-PR check and a markdown spell-check.
 
@@ -152,9 +152,8 @@ to `main`, alongside a semantic-PR check and a markdown spell-check.
 
 **Known gaps** (tracked, not blocking):
 
-- The plan's *100% Layer A/B line-coverage* target is not yet met (measured
-  ≈ 75.8% `cascade_core`, ≈ 75.6% `cascade_dio`). Some required-surface verbs
-  (`enterPin`/`submitText`, the boundary-log formatter) still ship untested.
+- The plan's *100% Layer A/B line-coverage* target is not yet met. Some
+  required-surface verbs (`enterPin`/`submitText`) still ship untested.
 - Emulator mode (R6.3) and the semantics-label finder (R4.5) are deferred.
 
 ## Packages
