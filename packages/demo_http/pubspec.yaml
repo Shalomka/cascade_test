@@ -1,6 +1,6 @@
 name: demo_http
 description: Mirror demo app proving AC3 with the http transport.
-version: 0.1.0
+version: 0.2.0
 publish_to: none
 resolution: workspace
 
