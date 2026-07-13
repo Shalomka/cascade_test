@@ -2,10 +2,13 @@
 // as a `..withX()` DSL (R3.1).
 // ignore_for_file: use_setters_to_change_properties
 
+import 'dart:async';
+
 import 'package:bloc/bloc.dart';
 import 'package:cascade_core/src/builder/harness_config.dart';
 import 'package:cascade_core/src/builder/transport_installer.dart';
 import 'package:cascade_core/src/observability/boundary_log.dart';
+import 'package:cascade_core/src/registry/boundary_request.dart';
 import 'package:cascade_core/src/registry/boundary_response.dart';
 import 'package:cascade_core/src/registry/matchers.dart';
 import 'package:cascade_core/src/registry/stub.dart';
@@ -132,6 +135,53 @@ class TestHarnessBuilder {
 
   /// Registers an arbitrary [stub] on the shared registry (escape hatch).
   void withStub(Stub stub) => registry.register(stub);
+
+  /// Stubs a `GET` [path] whose response is computed from the request (CR-1).
+  ///
+  /// [handler] receives the matched [BoundaryRequest] (read `request.query`,
+  /// `request.body`, ...) and returns a [Res] mapped to the transport response.
+  ///
+  /// Only `statusCode` and `data` round-trip: `data` must be JSON-encodable
+  /// (the dio/http adapters `jsonEncode` it), a [Res.latency] returned *inside*
+  /// the handler is a silent no-op (use the outer [latency]), and [Res] carries
+  /// no headers (R7). A handler needing headers must drop to [withStub] with a
+  /// raw [RespondWithHandler].
+  void withGetHandler(
+    String path,
+    FutureOr<Res> Function(BoundaryRequest request) handler, {
+    Map<String, dynamic>? query,
+    Duration? latency,
+  }) => _registerHandler('GET', path, handler, query: query, latency: latency);
+
+  /// Stubs a `POST` [path] whose response is computed from the request (CR-1).
+  ///
+  /// See [withGetHandler] for the `statusCode`/`data`-only round-trip, the
+  /// JSON-encodable body contract, and the no-headers/no-latency limitation.
+  void withPostHandler(
+    String path,
+    FutureOr<Res> Function(BoundaryRequest request) handler, {
+    Duration? latency,
+  }) => _registerHandler('POST', path, handler, latency: latency);
+
+  void _registerHandler(
+    String method,
+    String path,
+    FutureOr<Res> Function(BoundaryRequest request) handler, {
+    Map<String, dynamic>? query,
+    Duration? latency,
+  }) {
+    registry.register(
+      Stub(
+        matcher: RequestMatcher(method, path, query: query),
+        outcomes: [
+          RespondWithHandler((request) async {
+            final res = await handler(request);
+            return BoundaryResponse(statusCode: res.statusCode, body: res.data);
+          }, latency: latency),
+        ],
+      ),
+    );
+  }
 
   void _registerHttp(
     String method,

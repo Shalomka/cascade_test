@@ -52,6 +52,62 @@ void main() {
       },
     );
 
+    test(
+      'withCallableHandler computes its body from the request and Firestore, '
+      'writing then reading back (CR-1)',
+      () async {
+        final builder = TestHarnessBuilder()
+          ..withDefaultLatency(Duration.zero)
+          ..useFirebase()
+          ..withCallableHandler('createOffer', (request, firestore) async {
+            const id = 'offer-1';
+            await firestore.doc('offers/$id').set({'title': 'Hello'});
+            return {'offerId': id};
+          });
+
+        final harness = await builder.buildHarnessAsync();
+
+        final result = await harness.callableClient.call<Map<String, dynamic>>(
+          'createOffer',
+        );
+        expect(result, {'offerId': 'offer-1'});
+
+        // The handler's write committed on the built fake Firestore.
+        final doc = await harness.firestore.doc('offers/offer-1').get();
+        expect(doc.data(), containsPair('title', 'Hello'));
+      },
+    );
+
+    test(
+      'withCallableHandler without useFirebase throws a descriptive '
+      'StateError at the boundary (CR1-S5)',
+      () async {
+        final builder = TestHarnessBuilder()
+          ..withDefaultLatency(Duration.zero)
+          ..withCallableHandler(
+            'createOffer',
+            (request, firestore) async => <String, dynamic>{},
+          )
+          // Build WITHOUT useFirebase(): no FakeFirebaseFirestore is installed.
+          ..buildHarness();
+
+        // Assert at the boundary — the accessor's StateError surfaces directly,
+        // not through the app (R3). It is a StateError, not a
+        // FirebaseFunctionsException, so nothing swallows it.
+        final client = FakeCallableClient(builder.registry);
+        await expectLater(
+          client.call<Map<String, dynamic>>('createOffer'),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              contains('No FakeFirebaseFirestore installed'),
+            ),
+          ),
+        );
+      },
+    );
+
     test('withSignedOutUser seeds a signed-out auth', () {
       final builder = TestHarnessBuilder()
         ..useFirebase()

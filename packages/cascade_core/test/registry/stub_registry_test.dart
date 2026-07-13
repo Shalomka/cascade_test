@@ -140,6 +140,72 @@ void main() {
       expect(registry.recorder.calls, hasLength(2));
     });
 
+    test('a handler with no latency inherits the registry default (CR-1)', () {
+      registry
+        ..defaultLatency = const Duration(milliseconds: 30)
+        ..register(
+          Stub(
+            matcher: const RequestMatcher('CALL', 'createOffer'),
+            outcomes: [
+              RespondWithHandler(
+                (_) => const BoundaryResponse(statusCode: 200),
+              ),
+            ],
+          ),
+        );
+
+      final resolved = registry.resolve(
+        const BoundaryRequest(
+          kind: BoundaryKind.callable,
+          method: 'CALL',
+          endpoint: 'createOffer',
+        ),
+      );
+
+      expect(resolved.outcome, isA<RespondWithHandler>());
+      expect(resolved.latency, const Duration(milliseconds: 30));
+    });
+
+    test(
+      'a handler participates in a sequence and honors its latency (CR1-S4)',
+      () async {
+        const request = BoundaryRequest(
+          kind: BoundaryKind.http,
+          method: 'POST',
+          endpoint: '/echo',
+          body: {'in': 1},
+        );
+        registry.register(
+          Stub(
+            matcher: const RequestMatcher('POST', '/echo'),
+            outcomes: [
+              const RespondWith(BoundaryResponse(statusCode: 403)),
+              RespondWithHandler(
+                (req) => BoundaryResponse(statusCode: 200, body: req.body),
+                latency: const Duration(milliseconds: 9),
+              ),
+            ],
+          ),
+        );
+
+        // First resolution: the plain response.
+        expect(
+          (registry.resolve(request).outcome as RespondWith)
+              .response
+              .statusCode,
+          403,
+        );
+
+        // Second: the handler outcome, carrying its per-outcome latency (R2.5).
+        final second = registry.resolve(request);
+        expect(second.latency, const Duration(milliseconds: 9));
+        final handler = (second.outcome as RespondWithHandler).handler;
+        final response = await handler(request);
+        expect(response.statusCode, 200);
+        expect(response.body, {'in': 1});
+      },
+    );
+
     test('reset clears stubs and recorded calls', () {
       registry
         ..register(

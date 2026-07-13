@@ -113,6 +113,60 @@ void main() {
       expect(_statusOf(builder.registry.resolve(_get('/raw'))), 204);
     });
 
+    test(
+      'withGetHandler computes a response from the request (CR1-S3)',
+      () async {
+        final builder = TestHarnessBuilder()
+          ..withGetHandler(
+            '/echo',
+            (request) => Res(200, data: {'q': request.query['id']}),
+            query: {'id': 'abc'},
+          );
+
+        final resolved = builder.registry.resolve(
+          const BoundaryRequest(
+            kind: BoundaryKind.http,
+            method: 'GET',
+            endpoint: '/echo',
+            query: {'id': 'abc'},
+          ),
+        );
+
+        final handler = (resolved.outcome as RespondWithHandler).handler;
+        final response = await handler(
+          const BoundaryRequest(
+            kind: BoundaryKind.http,
+            method: 'GET',
+            endpoint: '/echo',
+            query: {'id': 'abc'},
+          ),
+        );
+        expect(response.statusCode, 200);
+        expect(response.body, {'q': 'abc'});
+      },
+    );
+
+    test(
+      'withPostHandler computes a response from the body (CR1-S3)',
+      () async {
+        final builder = TestHarnessBuilder()
+          ..withPostHandler(
+            '/echo',
+            (request) async =>
+                Res(201, data: {'echo': (request.body! as Map)['in']}),
+          );
+
+        final resolved = builder.registry.resolve(
+          _post('/echo', body: {'in': 7}),
+        );
+
+        final handler = (resolved.outcome as RespondWithHandler).handler;
+        final response = await handler(_post('/echo', body: {'in': 7}));
+        expect(response.statusCode, 201);
+        expect(response.body, {'echo': 7});
+      },
+    );
+
     test('expectCalled and expectNeverCalled delegate to the recorder', () {
       final builder = TestHarnessBuilder()..withGet('/policies', data: {});
       builder.registry.resolve(_get('/policies'));

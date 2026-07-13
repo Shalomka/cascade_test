@@ -21,6 +21,21 @@ void main() {
       );
     });
 
+    test('formats a RespondWithHandler outcome as a static marker (CR-1)', () {
+      final resolved = ResolvedOutcome(
+        outcome: RespondWithHandler(
+          (_) => const BoundaryResponse(statusCode: 200),
+        ),
+        latency: const Duration(milliseconds: 5),
+      );
+
+      // The log runs before the handler executes, so it has no status/body.
+      expect(
+        formatBoundaryCall(request, resolved),
+        '[boundary] GET /policies -> handler (5ms)',
+      );
+    });
+
     test('formats a FailWith outcome as its error kind', () {
       const resolved = ResolvedOutcome(
         outcome: FailWith(BoundaryError(kind: BoundaryErrorKind.timeout)),

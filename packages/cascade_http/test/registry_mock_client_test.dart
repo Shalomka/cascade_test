@@ -34,6 +34,33 @@ void main() {
     });
 
     test(
+      'a handler computes the response and is invoked exactly once (CR1-S2)',
+      () async {
+        var calls = 0;
+        registry.register(
+          Stub(
+            matcher: const RequestMatcher('GET', '/echo'),
+            outcomes: [
+              RespondWithHandler((request) {
+                calls++;
+                return BoundaryResponse(
+                  statusCode: 200,
+                  body: {'path': request.endpoint},
+                );
+              }),
+            ],
+          ),
+        );
+
+        final response = await client.get(_uri('/echo'));
+
+        expect(response.statusCode, 200);
+        expect(jsonDecode(response.body), {'path': '/echo'});
+        expect(calls, 1);
+      },
+    );
+
+    test(
       'returns a stubbed 403 then 200 without throwing (D4 analog)',
       () async {
         registry.register(
