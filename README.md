@@ -326,8 +326,9 @@ program the same builder and drain through the same chain. Verbs live on
 Every faked boundary — an HTTP request, a callable, a Firestore read — resolves
 through one `StubRegistry`. A `withX()` verb registers a **stub** (a matcher plus
 an outcome); at run time the adapter builds a `BoundaryRequest`, the registry
-resolves it to either a `RespondWith` (data) or a `FailWith` (a *real* transport
-error), and the call is **recorded** for later assertion.
+resolves it to a `RespondWith` (static data), a `RespondWithHandler` (data
+*computed from the request*), or a `FailWith` (a *real* transport error), and the
+call is **recorded** for later assertion.
 
 - **`Res(statusCode, {data, latency})`** — the shorthand for one stubbed
   response. A non-2xx status is surfaced as a real transport response so your
@@ -337,8 +338,15 @@ error), and the call is **recorded** for later assertion.
   `withPostSequence(path, List<Res>)` return successive `Res`es across repeated
   calls to the same path (R2.6), e.g. `[Res(403), Res(200, data: {...})]` for a
   retry.
+- **Computed (handler) outcomes** — `withGetHandler` / `withPostHandler` /
+  `withCallableHandler` compute the response from the matched `BoundaryRequest`
+  at call time (CR-1), so a stub can model a call whose **server side-effect the
+  client reads back** (e.g. a callable that chooses an id, writes
+  `offers/{id}` to the fake Firestore, and returns `{offerId}`). The adapter
+  awaits the handler exactly once, after the outcome's latency. A handler slots
+  into a sequence like any other outcome via `withStub`.
 - **`withStub(Stub)`** — the escape hatch: register an arbitrary matcher/outcome
-  when no `withX` verb fits.
+  (including a raw `RespondWithHandler`) when no `withX` verb fits.
 - **Latency** — `withDefaultLatency(Duration)` sets the per-stub default (R2.5);
   a verb's own `latency:` overrides it.
 
@@ -375,6 +383,13 @@ changes (AC3, machine-checked byte-for-byte by `demo_http`).
 | `withPut(path, …)` / `withDelete(path, …)` | Stub a `PUT` / `DELETE`. |
 | `withGetSequence(path, List<Res>)` | Successive `GET`s return the sequence in order. |
 | `withPostSequence(path, List<Res>)` | `POST` sequence, e.g. `[Res(403), Res(200)]`. |
+| `withGetHandler(path, (request) => Res, {query, latency})` | Compute a `GET` response from the request (CR-1). |
+| `withPostHandler(path, (request) => Res, {latency})` | Compute a `POST` response from the request (CR-1). |
+
+Handler bodies must be JSON-encodable (the adapters `jsonEncode` them); `Res`
+carries no headers and a `Res.latency` returned *inside* a handler is a no-op, so
+a header/latency-computing handler drops to `withStub` with a raw
+`RespondWithHandler`.
 
 ```dart
 final app = TestApp()
@@ -425,6 +440,15 @@ harness injects a registry-backed `FakeCallableClient`, read back as
 |---|---|
 | `withCallable(name, {data})` | Stub the callable to return `data`. |
 | `withCallable(name, {error})` | Throw a **real** `FirebaseFunctionsException` carrying `error.code`. |
+| `withCallableHandler(name, (request, firestore) => body)` | Compute the result from the request **and the built fake Firestore** (CR-1) — write a doc, return an id, then read it back. |
+
+`withCallableHandler` late-binds the fake Firestore through the existing
+`harness.firestore` accessor, so it requires `useFirebase()` (verb order is
+free); without it the accessor's descriptive `StateError` surfaces at the call.
+The handler must `await` its own Firestore writes so they commit before the
+response is delivered. Reference: the `createOffer` flow in
+[test/acceptance/ac5_handler_outcome_test.dart](packages/demo_dio_firebase/test/acceptance/ac5_handler_outcome_test.dart)
+and [offers_cubit.dart](packages/demo_dio_firebase/lib/features/offers/offers_cubit.dart).
 
 `error` is a `FunctionsError`: `permissionDenied`, `unauthenticated`,
 `notFound`, `invalidArgument`, `unavailable`, `internal`, `cancelled`, or
