@@ -1,6 +1,6 @@
 name: cascade_test
 description: Workspace umbrella for the universal Flutter acceptance-test harness.
-version: 0.1.0+1
+version: 0.2.0+1
 publish_to: none
 
 environment:

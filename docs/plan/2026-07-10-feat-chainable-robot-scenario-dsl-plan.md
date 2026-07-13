@@ -11,7 +11,7 @@ date: 2026-07-10
 > **Prior plan:** [`docs/plan/2026-07-10-feat-universal-flutter-acceptance-test-harness-plan.md`](2026-07-10-feat-universal-flutter-acceptance-test-harness-plan.md) (the harness this layers onto).
 > **Produced non-interactively** except for three scoping decisions confirmed by the user (recorded under [Confirmed Decisions](#confirmed-decisions)). Every other fork is resolved toward the simplest spec-compliant option and recorded under [Auto-resolved Assumptions](#auto-resolved-assumptions).
 
-All paths are **relative to the workspace root** `/Users/robertasskiauteris/flutterprojects/cascade_test/`. The build stage may only create/modify the paths enumerated in the [File Manifest](#file-manifest-scope-contract), plus their sibling test files. Anything not listed is out of scope.
+All paths are **relative to the workspace root** (`cascade_test/`). The build stage may only create/modify the paths enumerated in the [File Manifest](#file-manifest-scope-contract), plus their sibling test files. Anything not listed is out of scope.
 
 ---
 

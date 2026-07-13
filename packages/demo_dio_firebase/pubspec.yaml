@@ -1,6 +1,6 @@
 name: demo_dio_firebase
 description: Demo app proving AC1/AC2 with dio + Firebase transports.
-version: 0.1.0
+version: 0.2.0
 publish_to: none
 resolution: workspace
 

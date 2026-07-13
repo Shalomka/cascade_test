@@ -15,7 +15,7 @@ date: 2026-07-10
 > recorded under **Auto-resolved Assumptions**.
 
 All file paths in this plan are **relative to the workspace root**
-`/Users/robertasskiauteris/flutterprojects/cascade_test/`. The build stage runs in a git
+(`cascade_test/`). The build stage runs in a git
 worktree and may only create/modify the paths enumerated in the **File Manifest (Scope
 Contract)** below, plus their sibling test files. Any path not listed here is out of scope.
 

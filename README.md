@@ -112,7 +112,7 @@ rewrite of them.
   with `alchemist` or `golden_toolkit` for that.
 - **Not a raw WebSocket / SSE / gRPC-stream harness** — reactive updates are
   modeled as Firebase streams (`.snapshots()`, `authStateChanges()`) only.
-- **Not yet on pub.dev** — consumed via a Git dependency (`v0.1.0`,
+- **Not yet on pub.dev** — consumed via a Git dependency (`v0.2.0`,
   `publish_to: none`).
 
 **Where it fits:**
