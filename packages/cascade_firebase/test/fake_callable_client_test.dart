@@ -36,6 +36,32 @@ void main() {
       );
     });
 
+    test(
+      'a handler computes the result and is invoked exactly once (CR1-S2)',
+      () async {
+        var calls = 0;
+        registry.register(
+          Stub(
+            matcher: const RequestMatcher('CALL', 'createOffer'),
+            outcomes: [
+              RespondWithHandler((request) {
+                calls++;
+                return BoundaryResponse(
+                  statusCode: 200,
+                  body: {'name': request.endpoint},
+                );
+              }),
+            ],
+          ),
+        );
+
+        final result = await client.call<Map<String, dynamic>>('createOffer');
+
+        expect(result, {'name': 'createOffer'});
+        expect(calls, 1);
+      },
+    );
+
     test('throws a real FirebaseFunctionsException on error (D4)', () async {
       registry.register(
         Stub(

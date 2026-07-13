@@ -29,19 +29,30 @@ final class FakeHttpClientAdapter implements HttpClientAdapter {
     final request = mapRequestOptions(options);
     final resolved = registry.resolve(request);
     await Future<void>.delayed(resolved.latency);
-    return switch (resolved.outcome) {
-      RespondWith(:final response) => ResponseBody.fromString(
-        jsonEncode(response.body),
-        response.statusCode,
-        headers: {
-          Headers.contentTypeHeader: [Headers.jsonContentType],
-          ...response.headers.map(
-            (key, value) => MapEntry(key, [value]),
-          ),
-        },
-      ),
-      FailWith(:final error) => throw _toDioException(error, options),
-    };
+    // A statement (not an expression) so the handler is awaited exactly once
+    // before the response body is built (CR1-S2).
+    switch (resolved.outcome) {
+      case RespondWith(:final response):
+        return _toResponseBody(response);
+      case RespondWithHandler(:final handler):
+        final response = await handler(request);
+        return _toResponseBody(response);
+      case FailWith(:final error):
+        throw _toDioException(error, options);
+    }
+  }
+
+  ResponseBody _toResponseBody(BoundaryResponse response) {
+    return ResponseBody.fromString(
+      jsonEncode(response.body),
+      response.statusCode,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+        ...response.headers.map(
+          (key, value) => MapEntry(key, [value]),
+        ),
+      },
+    );
   }
 
   @override

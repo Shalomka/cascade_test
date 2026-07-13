@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:cascade_core/src/registry/boundary_request.dart';
 import 'package:cascade_core/src/registry/boundary_response.dart';
 import 'package:cascade_core/src/registry/matchers.dart';
 
@@ -21,6 +24,26 @@ final class RespondWith extends StubOutcome {
 
   /// The response to return to the adapter.
   final BoundaryResponse response;
+}
+
+/// Computes its response from the matched request at call time (CR-1).
+///
+/// Unlike [RespondWith], the body is not baked at config time: the adapter
+/// awaits [handler] once, after the outcome's [latency], and delivers its
+/// [BoundaryResponse]. Slots into sequences and honors [latency] like any other
+/// [StubOutcome].
+///
+/// Recording and cursor advancement happen in `StubRegistry.resolve` *before*
+/// the handler runs, so a handler that throws still consumes its sequence slot
+/// and is recorded (R9) — the same semantics as a [FailWith] that throws.
+final class RespondWithHandler extends StubOutcome {
+  /// Creates a [RespondWithHandler] that computes its [BoundaryResponse] from
+  /// the matched [BoundaryRequest].
+  const RespondWithHandler(this.handler, {super.latency});
+
+  /// Computes the response from the matched request, awaited once per
+  /// resolution after [latency].
+  final FutureOr<BoundaryResponse> Function(BoundaryRequest request) handler;
 }
 
 /// Fail with a genuine transport [BoundaryError].

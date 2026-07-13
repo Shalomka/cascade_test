@@ -66,6 +66,7 @@ class FakeCallableClient implements CallableClient {
     await Future<void>.delayed(resolved.latency);
     return switch (resolved.outcome) {
       RespondWith(:final response) => response.body as T,
+      RespondWithHandler(:final handler) => (await handler(request)).body as T,
       FailWith(:final error) => throw HarnessFunctionsException(
         code: error.code ?? 'unknown',
         message: error.message ?? 'Callable $name failed',

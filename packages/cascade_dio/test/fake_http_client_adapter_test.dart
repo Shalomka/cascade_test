@@ -44,6 +44,35 @@ void main() {
     });
 
     test(
+      'a handler computes the response and is invoked exactly once (CR1-S2)',
+      () async {
+        var calls = 0;
+        registry.register(
+          Stub(
+            matcher: const RequestMatcher('GET', '/echo'),
+            outcomes: [
+              RespondWithHandler((request) {
+                calls++;
+                return BoundaryResponse(
+                  statusCode: 200,
+                  body: {'path': request.endpoint},
+                );
+              }),
+            ],
+          ),
+        );
+        final dio = _dio(registry);
+
+        final response = await dio.get<Map<String, dynamic>>('/echo');
+
+        expect(response.statusCode, 200);
+        expect(response.data, {'path': '/echo'});
+        // The single adapter await guarantees one invocation per resolution.
+        expect(calls, 1);
+      },
+    );
+
+    test(
       'a stubbed 403 then 200 sequence surfaces a real DioException (D4)',
       () async {
         registry.register(

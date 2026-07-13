@@ -9,6 +9,9 @@ import 'package:cascade_core/src/registry/stub_registry.dart';
 String formatBoundaryCall(BoundaryRequest request, ResolvedOutcome outcome) {
   final result = switch (outcome.outcome) {
     RespondWith(:final response) => 'status ${response.statusCode}',
+    // The log runs in `resolve()`, before the handler executes, so there is no
+    // status/body yet — render a static marker (R2).
+    RespondWithHandler() => 'handler',
     FailWith(:final error) => 'error ${error.kind.name}',
   };
   return '[boundary] ${request.method} ${request.endpoint} -> $result '

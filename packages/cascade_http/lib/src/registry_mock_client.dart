@@ -12,23 +12,34 @@ import 'package:http/testing.dart';
 /// [FailWith] outcome raises a genuine [http.ClientException].
 http.Client registryMockClient(StubRegistry registry) {
   return MockClient((request) async {
-    final resolved = registry.resolve(_mapRequest(request));
+    final boundaryRequest = _mapRequest(request);
+    final resolved = registry.resolve(boundaryRequest);
     await Future<void>.delayed(resolved.latency);
-    return switch (resolved.outcome) {
-      RespondWith(:final response) => http.Response(
-        jsonEncode(response.body),
-        response.statusCode,
-        headers: {
-          'content-type': 'application/json',
-          ...response.headers,
-        },
-      ),
-      FailWith(:final error) => throw http.ClientException(
-        error.message ?? error.kind.name,
-        request.url,
-      ),
-    };
+    // A statement (not an expression) so the handler is awaited exactly once
+    // before the response body is built (CR1-S2).
+    switch (resolved.outcome) {
+      case RespondWith(:final response):
+        return _toResponse(response);
+      case RespondWithHandler(:final handler):
+        return _toResponse(await handler(boundaryRequest));
+      case FailWith(:final error):
+        throw http.ClientException(
+          error.message ?? error.kind.name,
+          request.url,
+        );
+    }
   });
+}
+
+http.Response _toResponse(BoundaryResponse response) {
+  return http.Response(
+    jsonEncode(response.body),
+    response.statusCode,
+    headers: {
+      'content-type': 'application/json',
+      ...response.headers,
+    },
+  );
 }
 
 BoundaryRequest _mapRequest(http.Request request) {

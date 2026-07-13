@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cascade_core/cascade_core.dart';
 import 'package:cascade_firebase/src/auth_seeder.dart';
 import 'package:cascade_firebase/src/callable_client.dart';
@@ -65,6 +67,42 @@ extension FirebaseInstaller on TestHarnessBuilder {
         : RespondWith(BoundaryResponse(statusCode: 200, body: data));
     registry.register(
       Stub(matcher: RequestMatcher('CALL', name), outcomes: [outcome]),
+    );
+  }
+
+  /// Stubs the callable [name] to compute its body from the request and the
+  /// built fake Firestore (CR-1). Requires [useFirebase]; verb order is free.
+  ///
+  /// The [handler] runs during the test (post-build): reading
+  /// `harness.firestore` resolves the installed fake, or throws a descriptive
+  /// `StateError` if `useFirebase()` never ran. Its returned body is delivered
+  /// as a `200` [BoundaryResponse] and cast to the caller's `T` in
+  /// `FakeCallableClient.call` (so request a `T` matching the handler's body).
+  ///
+  /// The handler must `await` its own Firestore writes so they commit before
+  /// the response is delivered (the adapter awaits the handler exactly once).
+  void withCallableHandler(
+    String name,
+    FutureOr<Object?> Function(
+      BoundaryRequest request,
+      FakeFirebaseFirestore firestore,
+    )
+    handler,
+  ) {
+    registry.register(
+      Stub(
+        matcher: RequestMatcher('CALL', name),
+        outcomes: [
+          RespondWithHandler((request) async {
+            // Late-bind via the existing accessor: post-build it resolves the
+            // installed fake; without `useFirebase()` it throws a descriptive
+            // StateError (CR1-S5).
+            final firestore = harness.firestore;
+            final body = await handler(request, firestore);
+            return BoundaryResponse(statusCode: 200, body: body);
+          }),
+        ],
+      ),
     );
   }
 
