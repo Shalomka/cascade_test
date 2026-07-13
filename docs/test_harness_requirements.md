@@ -12,7 +12,7 @@ VGV robot pattern.
 
 ## 1. Context & Goal
 
-The reference app's front-end has a fluent widget-test harness (`TestApp`) that
+The reference app's frontend has a fluent widget-test harness (`TestApp`) that
 boots the whole app, stubs the network at the API-client level, and drives UI by
 widget keys through robots. ~100 test files depend on it. It works well but is
 app-coupled (imports `App`, `app_ui`, feature keys) and stubs the wrong layer

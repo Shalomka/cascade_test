@@ -17,9 +17,30 @@
   "useGitignore": true,
   "words": [
     "cascade_test",
+    "consumability",
+    "Creds",
+    "CRTP",
+    "Expando",
+    "fakeable",
+    "footgun",
+    "footguns",
     "gRPC",
+    "microtask",
     "mocktail",
+    "pubspecs",
+    "relitigate",
+    "Riverpod",
+    "Robertas",
+    "sandboxed",
+    "Skiauteris",
     "SSE",
-    "webviews"
+    "subclassable",
+    "Toggleable",
+    "unbuilt",
+    "unstubbed",
+    "upserts",
+    "watchlist",
+    "webviews",
+    "worktree"
   ]
 }
