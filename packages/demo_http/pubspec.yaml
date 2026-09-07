@@ -21,4 +21,4 @@ dev_dependencies:
     path: ../cascade_http
   flutter_test:
     sdk: flutter
-  very_good_analysis: ^10.3.0
+  very_good_analysis: ^11.0.0
